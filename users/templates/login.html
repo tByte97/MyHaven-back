@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Вхід - My Haven{% endblock %}
+
+{% block content %}
+<div class="brand">
+    <img src="{% static 'img/logo(black).png' %}" alt="logo">
+</div>
+<div class.card fat">
+    <div class="card-body">
+        <h4 class="card-title">Login</h4>
+        <form method="POST" class="my-login-validation" novalidate="">
+            
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="id_username">Ім'я користувача</label>
+                <input id="id_username" type="text" 
+                       class="form-control {% if form.username.errors %}is-invalid{% endif %}" 
+                       name="username" 
+                       value="{{ form.username.value|default:'' }}" 
+                       required>
+                <div class="invalid-feedback">
+                    {% for error in form.username.errors %} {{ error }} {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="id_password">Пароль</label>
+                <input id="id_password" type="password" 
+                       class="form-control {% if form.password.errors %}is-invalid{% endif %}" 
+                       name="password" 
+                       required data-eye>
+                <div class="invalid-feedback">
+                    {% for error in form.password.errors %} {{ error }} {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group m-0">
+                <button type="submit" class="btn btn-primary btn-block">
+                    Login
+                </button>
+            </div>
+            <div class="mt-4 text-center">
+                Ще не маєте акаунту? 
+                <a href="{% url 'register' %}" style="color: black;">Реєстрація</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

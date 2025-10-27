@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Головна - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="card fat">
+    <div class="card-body">
+        <h4 class="card-title">Ласкаво просимо, {{ user.username }}!</h4>
+        <p>
+            Це ваша головна сторінка. Згодом тут з'являться ваші рахунки
+            та фінансова аналітика.
+        </p>
+        <div class="mt-4 text-center">
+                Бажаєте вийти? 
+                <a href="{% url 'logout' %}" style="color: black;">Вихід</a>
+            </div>
+    </div>
+</div>
+{% endblock %}

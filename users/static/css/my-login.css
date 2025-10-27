@@ -1,0 +1,119 @@
+html, body {
+    height: 100%;
+}
+body.my-login-page {
+    background-color: #f7f9fb;
+    font-size: 14px;
+}
+.my-login-page .btn:active {
+    background-color: #808080; /* Сірий колір при натисканні */
+    color: #fff; /* Залишаємо білий текст */
+}
+
+.my-login-page .form-control {
+  border: 2.3px solid #000; /* чорна рамка */
+  background-color: #fff; /* білий фон поля */
+  color: #000; /* чорний текст */
+}
+.my-login-page .brand {
+    width: 90px;
+    height: 90px;
+    overflow: hidden;
+    border-radius: 50%;
+    margin: 40px auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,.05);
+    position: relative;
+    z-index: 1;
+}
+.my-login-page .brand img {
+    width: 100%;
+}
+.my-login-page .card-wrapper {
+    width: 400px;
+}
+.my-login-page .card {
+    border-color: transparent;
+    box-shadow: 0 4px 8px rgba(0,0,0,.05);
+}
+.my-login-page .card.fat {
+    padding: 10px;
+}
+.my-login-page .card .card-title {
+    margin-bottom: 30px;
+}
+.my-login-page .form-control {
+    border-width: 2.3px;
+    border-color: #000;
+    background-color: #fff;
+    color: #000;
+}
+.my-login-page .form-control:focus {
+    border-color: #000;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+.my-login-page .form-group label {
+    width: 100%;
+}
+.my-login-page .btn {
+    background-color: #000;
+    color: #fff;
+    border: none;
+}
+.my-login-page .btn:hover {
+    background-color: #333; /* темно-сірий колір при наведенні */
+}
+.my-login-page .btn.btn-block {
+    padding: 10px 10px;
+}
+
+.google-btn {
+    position: relative;
+    left: 142px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+.google-logo {
+    width: 24px;
+    height: 24px;
+}
+.google-btn:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: black;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.my-login-page .footer {
+    margin: 40px 0;
+    color: #888;
+    text-align: center;
+}
+@media screen and (max-width: 425px) {
+    .my-login-page .card-wrapper {
+        width: 90%;
+        margin: 0 auto;
+    }
+}
+@media screen and (max-width: 320px) {
+    .my-login-page .card.fat {
+        padding: 0;
+    }
+    .my-login-page .card.fat .card-body {
+        padding: 15px;
+    }
+}
