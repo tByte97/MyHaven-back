@@ -1,5 +1,3 @@
-# users/forms.py
-
 from django.contrib.auth.forms import UserCreationForm
 from django import forms
 from .models import CustomUser
@@ -10,6 +8,5 @@ class RegisterForm(UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = CustomUser
-        # Вказуємо, які поля форма має обробляти
         fields = ('username', 'email')
         

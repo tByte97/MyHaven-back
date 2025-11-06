@@ -5,6 +5,7 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from .forms import RegisterForm 
+from core.settings import LOGIN_REDIRECT_URL, LOGOUT_REDIRECT_URL
 
 @login_required
 def home_view(request): 
@@ -20,7 +21,7 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect('userhome')
+            return redirect(LOGIN_REDIRECT_URL)
         else:
             print("!!!!!!!!")
             print(form.errors)
@@ -33,7 +34,7 @@ def register(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('userhome')
+        return redirect(LOGIN_REDIRECT_URL)
 
     if request.method == 'POST':
         form = AuthenticationForm(request, data = request.POST)
@@ -44,11 +45,11 @@ def login_view(request):
             user = authenticate(username = username, password = password)
             if user is not None:
                 login(request, user)
-                return redirect('userhome')
+                return redirect(LOGIN_REDIRECT_URL)
     else:
         form = AuthenticationForm()
     return render(request, 'login.html', {'form': form}) 
 
 def logout_view(request):
     logout(request)
-    return redirect('login')
+    return redirect(LOGOUT_REDIRECT_URL)
