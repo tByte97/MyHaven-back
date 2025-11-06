@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from django.db.models import Sum
+from decimal import Decimal
 # Create your models here.
 
 class Bank(models.Model):
@@ -24,7 +26,6 @@ class Account(models.Model):
     account_name = models.CharField(max_length=100, verbose_name="Назва рахунку")
     account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES, default='CARD')
     last_four_digits = models.CharField(max_length=4, blank=True, verbose_name="Останні 4 цифри")
-    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     currency = models.CharField(max_length=3, default='UAH')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -37,3 +38,12 @@ class Account(models.Model):
     def __str__(self):
         return self.account_name
 
+#Розраховує поточний баланс рахунку, підсумовуючи всі пов'язані з ним транзакції.
+    
+@property
+def calculated_balance(self):
+    result = self.transactions.aggregate(
+        total=Sum('amount')
+    )['total']
+    
+    return result or Decimal('0.00')

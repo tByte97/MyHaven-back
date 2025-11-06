@@ -20,5 +20,8 @@ from users.views import register, home_view, logout_view, login_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('users.urls'))
+    path('', include('users.urls')),
+    path('', include('transactions.urls'))
+    # path('account/', include('accounts.urls'))
+
 ]
