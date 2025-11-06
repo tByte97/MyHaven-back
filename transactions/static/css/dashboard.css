@@ -1,0 +1,117 @@
+/* --- Стилі для Dropbox (тільки на дашборді) --- */
+.dropbox {
+    position: relative;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+.dropbox p {
+    margin: 0 0 10px 0;
+    color: #666;
+}
+.dropbox input[type="file"] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+.dropbox-label {
+    color: #007bff;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background-color: #f0f8ff;
+}
+.dropbox-label:hover {
+    background-color: #e0f0ff;
+}
+.dropbox.highlight {
+    border-color: #007bff;
+    background-color: #f8faff;
+}
+#file-name-display {
+    display: block;
+    margin-top: 15px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* --- Стилі для Chart.js (тільки на дашборді) --- */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+#myChart {
+    max-height: 300px !important;
+}
+
+/* --- СТИЛІ ДЛЯ ВІДЖЕТІВ ДАШБОРДУ --- */
+.stat-number {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+.stat-expense {
+    color: #dc3545; /* Червоний */
+}
+.stat-income {
+    color: #28a745; /* Зелений */
+}
+.stat-balance {
+    color: #333; /* Чорний */
+}
+
+/* Список транзакцій (для віджету "Останні 10") */
+.transaction-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+.transaction-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+}
+.transaction-list li:last-child {
+    border-bottom: none;
+}
+.transaction-list .description {
+    color: #333;
+}
+.transaction-list .amount {
+    font-weight: 600;
+    white-space: nowrap;
+    margin-left: 10px;
+}
+
+/* --- Адаптивність для дашборду --- */
+@media (max-width: 768px) {
+    .chart-container {
+        height: 250px;
+    }
+    #myChart {
+        max-height: 250px !important;
+    }
+    .stat-number {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-number {
+        font-size: 20px;
+    }
+}

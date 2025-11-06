@@ -1,0 +1,67 @@
+{% load static %} 
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Мій Гаманець{% endblock %}</title>
+    
+    <link rel="stylesheet" type="text/css" href="{% static 'css/base_app.css' %}">
+    
+    {% block styles %}{% endblock %}
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="logo">
+            MyHaven
+        </div>
+        </header>
+
+    <div class="page-container">
+        <aside class="sidebar">
+            
+            <h3>Мій Гаманець</h3>
+            <ul class="sidebar-nav">
+                <li>
+                    <a href="{% url 'transactions:dashboard' %}" 
+                       class="{% if request.resolver_match.view_name == 'transactions:dashboard' %}active{% endif %}">
+                       Дашборд
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'transactions:list' %}" 
+                       class="{% if request.resolver_match.view_name == 'transactions:list' %}active{% endif %}">
+                       Транзакції
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'transactions:statistics' %}" 
+                       class="{% if request.resolver_match.view_name == 'transactions:statistics' %}active{% endif %}">
+                       Статистика
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'transactions:dashboard' %}#upload-section" style="font-weight: bold; color: #007bff;">
+                        Завантажити нову виписку
+                    </a>
+                </li>
+            </ul>
+            <h3 style="margin-top: 30px;">My Account</h3> <ul class="sidebar-nav">
+                <li><a href="#" class="{% if request.resolver_match.view_name == 'profile' %}active{% endif %}">Profile</a></li>
+                <li><a href="#">Appearance</a></li>
+                <li><a href="#">Wishlist</a></li>
+                <li><a href="#">Payment</a></li>
+                <li><a href="{% url 'logout' %}">Log Out</a></li>
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+{% block script %}{% endblock %}
+</body>
+</html> 

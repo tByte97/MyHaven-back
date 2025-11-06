@@ -1,0 +1,128 @@
+/* --- Стилі для сторінки списку транзакцій --- */
+
+/* Форма фільтрів */
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+/* .form-group стилі вже є в base_app.css */
+
+.filter-form .form-group label {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.filter-form .form-control,
+.filter-form .form-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.filter-buttons .btn-primary-upload {
+    padding: 10px 15px;
+    font-size: 14px;
+    width: auto;
+}
+
+.filter-buttons .btn-secondary {
+    display: inline-block;
+    padding: 10px 15px;
+    font-size: 14px;
+    background-color: #f0f0f0;
+    color: #333;
+    border-radius: 5px;
+    text-decoration: none;
+    border: 1px solid #ddd;
+}
+
+.filter-buttons .btn-secondary:hover {
+    background-color: #e0e0e0;
+}
+
+/* Таблиця транзакцій */
+.transaction-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background-color: white; /* Додано, щоб таблиця була на білому фоні */
+}
+
+.transaction-table th,
+.transaction-table td {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+}
+
+.transaction-table th {
+    background-color: #f9f9f9;
+    font-weight: 600;
+    color: #555;
+}
+
+.transaction-table tr:hover {
+    background-color: #fcfcfc;
+}
+
+/* .amount стилі вже є в base_app.css (stat-expense/stat-income) */
+.transaction-table td .amount {
+    font-weight: 600;
+}
+
+/* Пагінація */
+.pagination {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.pagination .step-links a {
+    color: #007bff;
+    text-decoration: none;
+    margin: 0 5px;
+}
+
+.pagination .step-links .current {
+    font-weight: 600;
+    margin: 0 10px;
+}
+
+/* --- Адаптивність для списку --- */
+@media (max-width: 768px) {
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-buttons {
+        flex-direction: column;
+    }
+    
+    .filter-buttons .btn-primary-upload,
+    .filter-buttons .btn-secondary {
+        width: 100%;
+    }
+    
+    .transaction-table {
+        font-size: 12px;
+    }
+    
+    .transaction-table th,
+    .transaction-table td {
+        padding: 8px 5px;
+    }
+}

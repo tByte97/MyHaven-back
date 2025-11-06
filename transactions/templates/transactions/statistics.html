@@ -1,0 +1,205 @@
+{% extends 'base_transactions.html' %}
+{% load static %}
+
+{% block title %}Статистика | Мій Гаманець{% endblock %}
+
+{% block content %}
+<h2>Статистика</h2>
+
+<div class="profile-card" style="margin-bottom: 20px;">
+    <h3 class="section-title" style="margin-top: 0;">Фільтр</h3>
+    <form method="GET" style="display: flex; gap: 10px; align-items: end;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="months">Період (місяців):</label>
+            <select name="months" id="months" class="form-control">
+                <option value="1" {% if months == 1 %}selected{% endif %}>1 місяці</option>
+                <option value="3" {% if months == 3 %}selected{% endif %}>3 місяці</option>
+                <option value="6" {% if months == 6 %}selected{% endif %}>6 місяців</option>
+                <option value="12" {% if months == 12 %}selected{% endif %}>12 місяців</option>
+                <option value="24" {% if months == 24 %}selected{% endif %}>24 місяці</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-primary-upload">Застосувати</button>
+    </form>
+</div>
+
+<div class="profile-card" style="margin-bottom: 20px;">
+    <h3 class="section-title" style="margin-top: 0;">Доходи та витрати по місяцях</h3>
+    <div class="chart-container" style="height: 400px;">
+        <canvas id="monthlyChart"></canvas>
+    </div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px;">
+    <div class="profile-card" style="flex: 1; min-width: 300px;">
+        <h3 class="section-title" style="margin-top: 0;">Витрати по категоріях</h3>
+        <div class="chart-container">
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="profile-card" style="flex: 1; min-width: 300px;">
+        <h3 class="section-title" style="margin-top: 0;">По банкам</h3>
+        <div class="chart-container">
+            <canvas id="bankChart"></canvas>
+        </div>
+    </div>
+</div>
+
+{{ monthly_stats_json|json_script:"monthly-data" }}
+{{ expenses_by_category_json|json_script:"category-data" }}
+{{ by_bank_json|json_script:"bank-data" }}
+
+{% endblock %}
+
+{% block script %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+        const monthlyData = {{ monthly_stats_json|safe }};
+        const categoryData = {{ expenses_by_category_json|safe }};
+        const bankData = {{ by_bank_json|safe }};
+
+    const monthlyCtx = document.getElementById('monthlyChart');
+    if (monthlyCtx) {
+        if (monthlyData && monthlyData.length > 0) {
+            const labels = monthlyData.map(item => {
+                const date = new Date(item.month);
+                return date.toLocaleDateString('uk-UA', { month: 'short', year: 'numeric' });
+            });
+            const expenses = monthlyData.map(item => Math.abs(item.expenses || 0));
+            const incomes = monthlyData.map(item => item.incomes || 0);
+
+            new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Доходи',
+                            data: incomes,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Витрати',
+                            data: expenses,
+                            backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                            borderColor: 'rgba(220, 53, 69, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => value.toFixed(0) + ' грн'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: context =>
+                                    `${context.dataset.label}: ${context.parsed.y.toFixed(2)} грн`
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            monthlyCtx.parentElement.innerHTML =
+                '<p style="text-align: center; color: #999;">Немає даних за обраний період</p>';
+        }
+    }
+
+    // === 2. Графік витрат по категоріях ===
+    const categoryCtx = document.getElementById('categoryChart');
+    if (categoryCtx) {
+        if (categoryData && categoryData.length > 0) {
+            const labels = categoryData.map(item => item.category__name);
+            const data = categoryData.map(item => Math.abs(item.total));
+
+            new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Витрати',
+                        data: data,
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' },
+                        tooltip: {
+                            callbacks: {
+                                label: context => {
+                                    const value = context.parsed.toFixed(2);
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percent = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${value} грн (${percent}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            categoryCtx.parentElement.innerHTML =
+                '<p style="text-align: center; color: #999;">Немає даних про витрати</p>';
+        }
+    }
+
+    const bankCtx = document.getElementById('bankChart');
+    if (bankCtx) {
+        if (bankData && bankData.length > 0) {
+            const labels = bankData.map(item => item.account__bank__name || 'Без банку');
+            const expenses = bankData.map(item => Math.abs(item.expenses || 0));
+            const incomes = bankData.map(item => item.incomes || 0);
+
+            new Chart(bankCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Доходи',
+                            data: incomes,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)'
+                        },
+                        {
+                            label: 'Витрати',
+                            data: expenses,
+                            backgroundColor: 'rgba(220, 53, 69, 0.7)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        } else {
+            bankCtx.parentElement.innerHTML =
+                '<p style="text-align: center; color: #999;">Немає даних по банкам</p>';
+        }
+    }
+});
+</script>
+{% endblock %}

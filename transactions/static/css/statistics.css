@@ -1,0 +1,47 @@
+.chart-container {
+    position: relative;
+    height: 350px; /* Висота для графіків */
+    width: 100%;
+}
+
+/* Сітка для двох менших графіків */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Дві рівні колонки */
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Форма для фільтрації місяців */
+.stats-filter-form {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.stats-filter-form label {
+    font-weight: 500;
+}
+
+.stats-filter-form .form-select {
+    width: 200px;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+}
+
+.stats-filter-form .btn-primary-upload {
+    width: auto;
+    padding: 8px 15px;
+    font-size: 14px;
+    margin-top: 0; /* Скидаємо відступ */
+}
+
+/* Адаптивність */
+@media (max-width: 900px) {
+    .stats-grid {
+        grid-template-columns: 1fr; /* Одна колонка на мобільних */
+    }
+}

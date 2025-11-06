@@ -1,0 +1,118 @@
+{% extends 'base_transactions.html' %}
+{% load static %}
+
+{% block styles %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/list.css' %}">
+{% endblock %}
+{% block title %}Усі транзакції | Мій Гаманець{% endblock %}
+
+{% block content %}
+    <h2>Список транзакцій</h2>
+
+    <div class="profile-card" style="margin-bottom: 20px;">
+        <form method="GET" action="{% url 'transactions:list' %}" class="filter-form">
+            <div class="filter-grid">
+                <div class="form-group">
+                    <label for="date_from">Дата від:</label>
+                    <input type="date" name="date_from" id="date_from" value="{{ current_filters.date_from|default:'' }}" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="date_to">Дата до:</label>
+                    <input type="date" name="date_to" id="date_to" value="{{ current_filters.date_to|default:'' }}" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Категорія:</label>
+                    <select name="category" id="category" class="form-select">
+                        <option value="">Усі категорії</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if current_filters.category == cat.id|stringformat:"s" %}selected{% endif %}>
+                                {{ cat.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="bank">Банк:</label>
+                    <select name="bank" id="bank" class="form-select">
+                        <option value="">Усі банки</option>
+                        {% for bank in banks %}
+                            <option value="{{ bank.id }}" {% if current_filters.bank == bank.id|stringformat:"s" %}selected{% endif %}>
+                                {{ bank.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="type">Тип:</label>
+                    <select name="type" id="type" class="form-select">
+                        <option value="">Усі</option>
+                        <option value="income" {% if current_filters.type == 'income' %}selected{% endif %}>Доходи</option>
+                        <option value="expense" {% if current_filters.type == 'expense' %}selected{% endif %}>Витрати</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-buttons">
+                <button type="submit" class="btn-primary-upload">Фільтрувати</button>
+                <a href="{% url 'transactions:list' %}" class="btn-secondary">Скинути</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="profile-card">
+        <table class="transaction-table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Опис</th>
+                    <th>Категорія</th>
+                    <th>Рахунок (Банк)</th>
+                    <th>Сума</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in page_obj %}
+                    <tr>
+                        <td>{{ tx.transaction_date|date:"d.m.Y H:i" }}</td>
+                        <td>{{ tx.description|truncatechars:50 }}</td>
+                        <td>{{ tx.category.name|default:"-" }}</td>
+                        <td>{{ tx.account.account_name }} ({{ tx.account.bank.name|default:"-" }})</td>
+                        <td class="amount {% if tx.amount < 0 %}stat-expense{% else %}stat-income{% endif %}">
+                            {{ tx.amount|floatformat:2 }}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 20px;">
+                            Транзакцій за обраними фільтрами не знайдено.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if page_obj.has_other_pages %}
+            <div class="pagination">
+                <span class="step-links">
+                    {% if page_obj.has_previous %}
+                        <a href="?page=1{{ request.GET.urlencode }}">&laquo; перша</a>
+                        <a href="?page={{ page_obj.previous_page_number }}{{ request.GET.urlencode }}">попередня</a>
+                    {% endif %}
+
+                    <span class="current">
+                        Сторінка {{ page_obj.number }} з {{ page_obj.paginator.num_pages }}.
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{{ request.GET.urlencode }}">наступна</a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}{{ request.GET.urlencode }}">остання &raquo;</a>
+                    {% endif %}
+                </span>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
