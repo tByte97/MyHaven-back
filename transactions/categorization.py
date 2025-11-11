@@ -96,17 +96,21 @@ def find_category_for_transaction(user, description: str, bank_category: str = '
 
 def create_default_categories(user):
     default_categories = [
+        {'name': 'Перекази', 'type': 'INCOME', 'keywords': ['переказ на свою картку', 'перекази', 'платежі за реквізитами']},
         {'name': 'Продукти', 'type': 'EXPENSE', 'keywords': ['сільпо', 'атб', 'ашан', 'фреш','супермаркет', 'магазин', 'продукти', 'траш', 'silpo', 'mahazyn']},
-        {'name': 'Транспорт', 'type': 'EXPENSE', 'keywords': ['бензин', 'авто', 'uber', 'bolt', 'таксі', 'метро', 'автобус', 'паркування']},
+        {'name': 'Транспорт', 'type': 'EXPENSE', 'keywords': ['бензин', 'авто', 'uber', 'uklon', 'bolt', 'таксі', 'метро', 'автобус', 'паркування']},
         {'name': 'Кафе та ресторани', 'type': 'EXPENSE', 'keywords': ['mcdonalds', 'kfc', 'кафе', 'ресторан', 'їжа', 'pizza']},
         {'name': 'Комунальні послуги', 'type': 'EXPENSE', 'keywords': ['комунальні', 'gas', 'вода', 'електроенергія', 'інтернет', 'kyivstar']},
-        {'name': 'Розваги', 'type': 'EXPENSE', 'keywords': ['кіно', 'театр', 'концерт', 'розваги', 'steam', 'playstation']},
+        {'name': 'Розваги', 'type': 'EXPENSE', 'keywords': ['кіно', 'театр', 'концерт', 'розваги', 'steam', 'playstation', 'цифрові товари', 'Поповнення мобільного']},
         {'name': 'Одяг та взуття', 'type': 'EXPENSE', 'keywords': ['одяг', 'взуття', 'zara', 'h&m', 'бутік']},
-        {'name': 'Здоров\'я', 'type': 'EXPENSE', 'keywords': ['аптека', 'лікарня', 'медицина', 'ліки', 'pharmacy']},
+        {'name': 'Здоров\'я', 'type': 'EXPENSE', 'keywords': ['аптека', 'лікарня', 'медицина', 'ліки', 'pharmacy', 'краса',  'аптека', 'аптеки']},
         {'name': 'Освіта', 'type': 'EXPENSE', 'keywords': ['курси', 'навчання', 'книги', 'освіта', 'udemy']},
+        {'name': 'Зняття готівки', 'type': 'EXPENSE', 'keywords': ['зняття готівки', 'навчання', 'книги', 'освіта', 'udemy']},
         {'name': 'Інше', 'type': 'EXPENSE', 'keywords': []}, 
+
         
         {'name': 'Зарплата', 'type': 'INCOME', 'keywords': ['зарплата', 'salary', 'заробітна']},
+        {'name': 'Надходження з інших карт', 'type': 'INCOME', 'keywords': ['зарахування переказу', 'переказ', 'зарахування']},
         {'name': 'Фріланс', 'type': 'INCOME', 'keywords': ['freelance', 'upwork', 'фріланс']},
         {'name': 'Подарунки', 'type': 'INCOME', 'keywords': ['подарунок', 'gift']},
         {'name': 'Стипендія', 'type': 'INCOME', 'keywords': ['стипендія', 'scholarship']},
@@ -114,7 +118,7 @@ def create_default_categories(user):
     ]
     
     for cat_data in default_categories:
-        Category.objects.get_or_create(
+        Category.objects.update_or_create(
             user=user,
             name=cat_data['name'],
             defaults={

@@ -1,12 +1,12 @@
-# transactions/views.py
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Sum, Q
 from django.db.models.functions import TruncMonth
 from django.core.paginator import Paginator
-
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
 from datetime import timedelta, datetime, date
 from django.utils import timezone
@@ -19,6 +19,15 @@ from .forms import UploadStatementForm
 from .parsers import PrivatBankExcelParser, MonobankExcelParser, UniversalCSVParser, PDFStatementParser
 from .categorization import CategoryMatcher, create_default_categories
 from accounts.models import Account, Bank
+from .serializers import TransactionSerializer
+
+
+# csrf
+from django.utils.decorators import method_decorator 
+from django.views.decorators.csrf import csrf_exempt
+
+
+
 
 class DecimalEncoder(json.JSONEncoder):    
     def default(self, obj):
@@ -28,6 +37,56 @@ class DecimalEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super(DecimalEncoder, self).default(obj)
 
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DashboardStatsAPI(APIView):
+    """
+    API-ендпоінт, що повертає дані для Дашборду.
+    """
+    permission_classes = [IsAuthenticated] # Лише для залогінених
+
+    def get(self, request):
+        all_transactions = Transaction.objects.filter(account__user=request.user)
+        has_transactions = all_transactions.exists()
+
+        if has_transactions:
+            month_ago = timezone.now() - timedelta(days=30)
+            transactions_last_month = all_transactions.filter(
+                transaction_date__gte=month_ago
+            )
+            
+            expenses = transactions_last_month.filter(amount__lt=0).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            incomes = transactions_last_month.filter(amount__gt=0).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            expenses_by_category_qs = transactions_last_month.filter(
+                amount__lt=0, category__isnull=False
+            ).values('category__name').annotate(total=Sum('amount')).order_by('total')[:5]
+            
+            recent_transactions_qs = all_transactions.order_by('-transaction_date')[:10]
+        
+        else:
+            expenses = Decimal('0')
+            incomes = Decimal('0')
+            expenses_by_category_qs = []
+            recent_transactions_qs = []
+
+        recent_transactions_json = TransactionSerializer(recent_transactions_qs, many=True).data
+        
+        data = {
+            'total_expenses': abs(expenses),
+            'total_incomes': incomes,
+            'balance': incomes + expenses,
+            'expenses_by_category': list(expenses_by_category_qs), 
+            'recent_transactions': recent_transactions_json,
+            'has_transactions': has_transactions,
+        }
+        
+        return Response(data)
 
 @login_required
 def dashboard_view(request):
@@ -233,18 +292,27 @@ def transactions_list_view(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+
     # Дані для фільтрів
     categories = Category.objects.filter(user=request.user)
     banks = Bank.objects.filter(accounts__user=request.user).distinct()
     
+    params = request.GET.copy()
+    if 'page' in params:
+        params.pop('page')
+    querystring = params.urlencode()
+    
     context = {
-        'page_obj': page_obj,
         'categories': categories,
         'banks': banks,
         'current_filters': request.GET,
+        'page_obj': page_obj,
+        'querystring': querystring,
     }
     
+
     return render(request, 'transactions/list.html', context)
+
 
 
 @login_required
