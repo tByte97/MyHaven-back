@@ -1,6 +1,7 @@
+import logging
 from .models import Category
-from difflib import SequenceMatcher
-import re
+
+logger = logging.getLogger(__name__)
 
 class CategoryMatcher:
     def __init__(self, user):
@@ -38,7 +39,7 @@ class CategoryMatcher:
         
         for category in self.categories:
             if category.name == fallback_name:
-                print(f"No strong match for '{description[:30]}...'. Falling back to: {fallback_name}")
+                logger.debug("No strong match for '%s…'. Fallback: %s", description[:30], fallback_name)
                 return category, 0.1 
         
         return None, 0
@@ -88,10 +89,10 @@ def find_category_for_transaction(user, description: str, bank_category: str = '
     )
     
     if category:
-        print(f"Match found: '{description[:30]}...' -> {category.name} (Score: {score:.2f})")
+        logger.debug("Match: '%s…' -> %s (%.2f)", description[:30], category.name, score)
         return category, score
     
-    print(f"No match for: '{description[:30]}...'")
+    logger.debug("No match for: '%s…'", description[:30])
     return None, 0
 
 def create_default_categories(user):

@@ -1,0 +1,75 @@
+{% extends 'base_transactions.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="glass-card">
+        <h2 class="text-white mb-4" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">
+            🗂 Менеджер файлів
+        </h2>
+        
+        <div class="table-responsive">
+            <table class="table text-white" style="border-collapse: separate; border-spacing: 0 10px;">
+                <thead>
+                    <tr style="opacity: 0.7;">
+                        <th>Банк</th>
+                        <th>Дата завантаження</th>
+                        <th>Статус</th>
+                        <th>Транзакцій</th>
+                        <th class="text-end">Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for upload in uploads %}
+                    <tr style="background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); border-radius: 10px;">
+                        <td class="ps-3 align-middle">
+                            {% if upload.bank %}
+                                {{ upload.bank.name }}
+                            {% else %}
+                                📁 Файл
+                            {% endif %}
+                        </td>
+                        <td class="align-middle">{{ upload.uploaded_at|date:"d.m.Y H:i" }}</td>
+                        <td class="align-middle">
+                            {% if upload.status == 'COMPLETED' %}
+                                <span class="badge bg-success bg-opacity-75 rounded-pill">Успішно</span>
+                            {% elif upload.status == 'FAILED' %}
+                                <span class="badge bg-danger bg-opacity-75 rounded-pill" title="{{ upload.processing_log }}">Помилка</span>
+                            {% else %}
+                                <span class="badge bg-warning bg-opacity-75 rounded-pill">Обробка...</span>
+                            {% endif %}
+                        </td>
+                        <td class="align-middle">{{ upload.processed_transactions }} шт.</td>
+                        <td class="text-end pe-3 align-middle">
+                            <form action="{% url 'transactions:delete_upload' upload.id %}" method="POST" onsubmit="return confirm('Видалити файл і всі дані з нього?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius: 50%; width: 35px; height: 35px; padding: 0;">
+                                    ✕
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 opacity-50">
+                            Завантажень поки немає. Завантажте виписку на головній.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Міні-CSS для цього шаблону, якщо ви ще не підключили глобальний */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+</style>
+{% endblock %}

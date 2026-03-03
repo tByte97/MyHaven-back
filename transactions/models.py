@@ -21,17 +21,35 @@ class Category(models.Model):
 
 
 class Transaction(models.Model):
-    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions', null=True, blank=True)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions', null = True, blank = True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.CharField(max_length=255)
     transaction_date = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     
+    SOURCE_CHOICES = (
+        ('import', 'Імпорт з банку'),
+        ('manual', 'Вручну'),
+        ('telegram', 'Telegram Бот'),
+    )
+    source = models.CharField(
+        max_length=20, 
+        choices=SOURCE_CHOICES, 
+        default='import'
+    )
+
     raw_description = models.TextField(blank=True) 
     bank_category = models.CharField(max_length=200, blank=True)  
     matched_automatically = models.BooleanField(default=False)
     confidence_score = models.FloatField(null=True, blank=True)
+    source_upload = models.ForeignKey(
+        'TransactionUpload', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='transactions')
 
     class Meta:
         ordering = ['-transaction_date']

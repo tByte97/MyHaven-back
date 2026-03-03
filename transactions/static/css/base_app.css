@@ -212,30 +212,7 @@ input:checked + .slider:before { transform: translateX(22px); }
 .info-section a { font-size: 14px; color: #007bff; text-decoration: none; font-weight: 500; }
 .info-section a:hover { text-decoration: underline; }
 
-/* --- Загальні Модальні вікна --- */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.4);
-    justify-content: center;
-    align-items: center;
-}
-.modal-content {
-    position: relative;
-    padding: 20px;
-    width: 90%;
-    max-width: 300px;
-    background-color: white;
-    border-radius: 5px;
-    text-align: center;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, .05);
-}
+
 
 /* --- Загальні стилі форм --- */
 .form-group {

@@ -115,3 +115,50 @@
         font-size: 20px;
     }
 }
+
+/* =========================================
+   НОВІ СТИЛІ ДЛЯ ФІЛЬТРІВ (GLASSMORPHISM)
+   ========================================= */
+
+/* Контейнер фільтрів */
+
+
+/* Приховуємо стандартний чекбокс */
+.filter-checkbox {
+    display: none;
+}
+
+/* Стиль кнопки (Чіп) */
+.filter-chip, .chip-content {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    
+    /* Скляний ефект за замовчуванням */
+    background: rgba(255, 255, 255, 0.15); 
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9); /* Майже білий текст */
+}
+
+/* Ховер ефект */
+.filter-chip:hover, .chip-content:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    color: white;
+}
+
+/* Активний стан (коли вибрано) */
+.filter-chip.active, 
+.filter-checkbox:checked + .chip-content {
+    /* Градієнт для активної кнопки */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(118, 75, 162, 0.5); /* Ефект світіння */
+    font-weight: 500;
+}
+

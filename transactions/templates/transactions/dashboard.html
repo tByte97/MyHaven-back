@@ -7,182 +7,280 @@
 
 {% block title %}Дашборд | Мій Гаманець{% endblock %}
 
+{% block content %} 
 
-{% block content %} {% if not has_transactions %}
-        <h2>Ласкаво просимо!</h2>
-        <p>Схоже, у вас ще немає транзакцій. Давайте завантажимо вашу першу виписку.</p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{% if not has_transactions %}Ласкаво просимо!{% else %}Дашборд{% endif %}</h2>
+        
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+            📥 Завантажити виписку
+        </button>
+    </div>
+
+    {% if not has_transactions %}
+        <p>Схоже, у вас ще немає транзакцій. Ви можете завантажити першу виписку через форму нижче або кнопку зверху.</p>
         
         <div class="profile-card" id="upload-section">
-            <h3 class="section-title" style="margin-top: 0;">Завантажити виписку</h3>
+            <h3 class="section-title" style="margin-top: 0;">Завантажити першу виписку</h3>
 
             <form action="{% url 'transactions:dashboard' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
-                
-                <div class="form-group">
-                    <label for="{{ upload_form.bank.id_for_label }}">1. Оберіть банк:</label>
+                <div class="form-group mb-3">
+                    <label class="form-label">1. Оберіть банк:</label>
                     {{ upload_form.bank }}
                 </div>
                 <div class="form-group">
-                    <label>2. Завантажте файл:</label>
-                    
-                    <div class="dropbox" id="dropbox">
+                    <label class="form-label">2. Завантажте файл:</label>
+                    <div class="dropbox" id="dropbox-static">
                         {{ upload_form.file }} 
-                        <p>Перетягніть файл (.xls, .csv, .pdf) сюди або</p>
-                        <label for="{{ upload_form.file.id_for_label }}" class="dropbox-label">
-                            натисніть, щоб обрати
-                        </label>
-                        <span id="file-name-display"></span>
+                        <p>Перетягніть файл (.xls, .csv, .pdf) сюди</p>
+                        <span id="file-name-static" class="text-primary fw-bold"></span>
                     </div>
-                    {% if upload_form.file.errors %}
-                        <div class="errors">{{ upload_form.file.errors }}</div>
-                    {% endif %}
                 </div> 
-                <button type="submit" class="btn-primary-upload">Завантажити</button>
+                <button type="submit" class="btn btn-primary mt-3">Завантажити</button>
             </form>
         </div>
 
     {% else %}
-        <h2>Дашборд (Огляд за 30 днів)</h2>
+        <div class="card mb-4 bg-light border-0">
+            <div class="card-body py-2">
+                <form method="GET" action="{% url 'transactions:dashboard' %}" id="filterForm">
+                    <div class="d-flex align-items-center flex-wrap">
+                        <strong class="me-3 text-secondary">Джерело:</strong>
+                        <div class="me-3">
+                        <button type="button" 
+                                class="btn btn-link text-decoration-none p-0 border-0 align-baseline" 
+                                onclick="clearFilters()"> Всі разом
+                        </button>                        </div>
+                        {% for upload in user_uploads %}
+                        <div class="form-check form-check-inline me-3">
+                            <input class="form-check-input" 
+                            type="checkbox" 
+                            name="uploads" 
+                            value="{{ upload.id }}" 
+                            id="upload_{{ upload.id }}" 
+                            {% if upload.id in current_filters %}checked{% endif %}
+                            onchange="handleFilterChange()">
+                            <label class="form-check-label cursor-pointer" for="upload_{{ upload.id }}">
+                                {{ upload.bank.name|default:"Файл" }} <span class="text-muted small">({{ upload.uploaded_at|date:"d.m" }})</span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+        </div>
 
-        <div class="profile-card" style="margin-bottom: 20px;">
-            <h3 class="section-title" style="margin-top: 0;">Витрати за місяць</h3>
+        <div class="profile-card mb-4">
+            <h3 class="section-title mt-0">Витрати за місяць</h3>
             <div class="chart-container">
                 <canvas id="myChart"></canvas> 
             </div>
         </div>
-
+        
         <div class="profile-grid">
             <div class="profile-card">
                 <h3>Загальні витрати</h3>
                 <div class="stat-number stat-expense">{{ total_expenses|floatformat:2 }} грн</div>
-                <p>Сума всіх витрат за 30 днів</p>
             </div>
-            
             <div class="profile-card">
                 <h3>Загальні доходи</h3>
                 <div class="stat-number stat-income">{{ total_incomes|floatformat:2 }} грн</div>
-                <p>Сума всіх доходів за 30 днів</p>
             </div>
-            
             <div class="profile-card">
                 <h3>Чистий баланс</h3>
                 <div class="stat-number stat-balance">{{ balance|floatformat:2 }} грн</div>
-                <p>Різниця між доходами та витратами</p>
             </div>
         </div>
 
         <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">
-            
             <div class="profile-card" style="flex: 2; min-width: 300px;">
-                <h3 class="section-title" style="margin-top: 0;">Останні 10 транзакцій</h3>
-                
+                <h3 class="section-title mt-0">Останні транзакції</h3>
                 <ul class="transaction-list">
                     {% for tx in recent_transactions %}
                         <li>
-                            <span class="description">
-                                {{ tx.transaction_date|date:"d M" }} - {{ tx.description|truncatechars:40 }}
-                            </span>
-                            <span class="amount {% if tx.amount < 0 %}stat-expense{% else %}stat-income{% endif %}">
-                                {{ tx.amount|floatformat:2 }}
-                            </span>
+                            <span class="description">{{ tx.transaction_date|date:"d M" }} - {{ tx.description|truncatechars:40 }}</span>
+                            <span class="amount {% if tx.amount < 0 %}stat-expense{% else %}stat-income{% endif %}">{{ tx.amount|floatformat:2 }}</span>
                         </li>
                     {% empty %}
-                        <li>У вас ще немає транзакцій.</li>
+                        <li>Транзакцій не знайдено.</li>
                     {% endfor %}
                 </ul>
             </div>
-            
             <div class="profile-card" style="flex: 1; min-width: 250px;">
-                <h3 class="section-title" style="margin-top: 0;">Топ 5 категорій витрат</h3>
-                
+                <h3 class="section-title mt-0">Топ категорій</h3>
                 <ul class="transaction-list">
                     {% for cat in expenses_by_category %}
-                        <li>
-                           <span class="description">{{ cat.category__name }}</span>
-                           <span class="amount stat-expense">{{ cat.total|floatformat:2|slice:"1:" }}</span>
-                        </li>
+                        <li><span class="description">{{ cat.category__name }}</span><span class="amount stat-expense">{{ cat.total|floatformat:2|slice:"1:" }}</span></li>
                     {% empty %}
-                       <li>Немає даних про витрати.</li>
+                        <li>Немає даних.</li>
                     {% endfor %}
                 </ul>
             </div>
         </div>
-        
     {% endif %}
 
-{% endblock %} {% block script %}
-{{ block.super }} {% if has_transactions %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const ctx = document.getElementById('myChart');
-            if (ctx) { // Перевіряємо, що <canvas> існує
-                const categoryData = {{ expenses_by_category_json|safe }};
-                const labels = categoryData.map(item => item.category__name);
-                const data = categoryData.map(item => Math.abs(item.total));
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Завантажити нову виписку</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{% url 'transactions:dashboard' %}" method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">1. Оберіть банк:</label>
+                            {{ upload_form.bank }} 
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">2. Файл виписки:</label>
+                            <div class="dropbox" id="dropbox-modal">
+                                {{ upload_form.file }} 
+                                <p class="mb-1">Перетягніть файл сюди</p>
+                                <small class="text-muted">або натисніть</small>
+                                <span id="file-name-modal" class="d-block mt-2 fw-bold text-primary"></span>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Завантажити та обробити</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                new Chart(ctx, {
-                    type: 'doughnut', // Тип графіка
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Витрати',
-                            data: data,
-                            backgroundColor: [
-                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
-                            ]
-                        }]
-                    },
-                    options: { 
-                        responsive: true,
-                        maintainAspectRatio: false, 
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                            },
-                        }
-                    }
-                });
+{% endblock %} 
+
+{% block script %}
+{{ block.super }} 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    async function handleFilterChange() {
+        const checkboxes = document.querySelectorAll('input[name="uploads"]:checked');
+        const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+        // 2. Відправляємо ці ID на сервер (в наш новий API)
+        try {
+            const response = await fetch('/transactions/api/filter/update/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}' 
+                },
+                body: JSON.stringify({ 'uploads': selectedIds })
+            });
+
+            if (response.ok) {
+                console.log("Фільтр оновлено!");
+                
+                // 3. ПЕРЕЗАВАНТАЖЕННЯ (Поки що)
+                // Оскільки у нас ще не повний Vue SPA, нам треба оновити сторінку,
+                // щоб Django перемалював HTML з новими даними з сесії.
+                window.location.reload(); 
+            } else {
+                console.error("Помилка оновлення:", await response.text());
             }
-        });
-    </script>
-{% else %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const dropbox = document.getElementById('dropbox');
-            if (dropbox) { 
-                const fileInput = document.getElementById('{{ upload_form.file.id_for_label }}');
-                const fileNameDisplay = document.getElementById('file-name-display');
+        } catch (err) {
+            console.error("Помилка мережі:", err);
+        }
+        }
 
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    dropbox.addEventListener(eventName, preventDefaults, false);
-                });
-                function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        function clearFilters() {
+        const checkboxes = document.querySelectorAll('input[name="uploads"]');
+        checkboxes.forEach(cb => cb.checked = false);
+        
+        // Викликаємо головну функцію (вона побачить порожній список і відправить його на сервер)
+        handleFilterChange();
+        }
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- 1. ФУНКЦІЯ ДЛЯ НАЛАШТУВАННЯ DROPZONE ---
+        // Ми робимо функцію, щоб використати її двічі: для статичного дропбоксу і для модального
+        function initDropzone(boxId, nameDisplayId) {
+            const dropbox = document.getElementById(boxId);
+            const nameDisplay = document.getElementById(nameDisplayId);
+            
+            if (!dropbox) return; // Якщо елемента немає на сторінці - виходимо
 
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    dropbox.addEventListener(eventName, () => dropbox.classList.add('highlight'), false);
-                });
-                ['dragleave', 'drop'].forEach(eventName => {
-                    dropbox.addEventListener(eventName, () => dropbox.classList.remove('highlight'), false);
-                });
+            // Шукаємо input всередині конкретного dropbox
+            const fileInput = dropbox.querySelector('input[type="file"]');
+            if (!fileInput) return;
 
-                dropbox.addEventListener('drop', (e) => {
-                    fileInput.files = e.dataTransfer.files;
-                    updateFileName();
+            // Drag & Drop події
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropbox.addEventListener(eventName, (e) => {
+                    e.preventDefault(); e.stopPropagation();
                 }, false);
+            });
 
-                fileInput.addEventListener('change', updateFileName);
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropbox.addEventListener(eventName, () => dropbox.classList.add('highlight'), false);
+            });
 
-                function updateFileName() {
-                    if (fileInput.files.length > 0) {
-                        fileNameDisplay.textContent = 'Обрано файл: ' + fileInput.files[0].name;
-                    } else {
-                        fileNameDisplay.textContent = '';
-                    }
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropbox.addEventListener(eventName, () => dropbox.classList.remove('highlight'), false);
+            });
+
+            // Обробка падіння файлу
+            dropbox.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                fileInput.files = files;
+                updateName(files);
+            }, false);
+
+            // Обробка кліку (стандартний вибір)
+            fileInput.addEventListener('change', function() {
+                updateName(this.files);
+            });
+
+            function updateName(files) {
+                if (files && files.length > 0) {
+                    nameDisplay.textContent = 'Обрано: ' + files[0].name;
+                } else {
+                    nameDisplay.textContent = '';
                 }
             }
-        });
-    </script>
-{% endif %}
+        }
+        // --- 2. ІНІЦІАЛІЗАЦІЯ DROPZONES ---
+        // Запускаємо логіку для обох варіантів (якщо вони існують в HTML)
+        initDropzone('dropbox-static', 'file-name-static'); // Той, що на початковому екрані
+        initDropzone('dropbox-modal', 'file-name-modal');   // Той, що в модальному вікні
 
+        // --- 3. ЛОГІКА ГРАФІКІВ (Тільки якщо є дані) ---
+        {% if has_transactions %}
+            const ctx = document.getElementById('myChart');
+            if (ctx) { 
+                const categoryData = {{ expenses_by_category_json|safe }};
+                if (categoryData && categoryData.length > 0) {
+                    const labels = categoryData.map(item => item.category__name);
+                    const data = categoryData.map(item => Math.abs(item.total));
+
+                    new Chart(ctx, {
+                        type: 'doughnut', 
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Витрати',
+                                data: data,
+                                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                            }]
+                        },
+                        options: { 
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { position: 'top' } }
+                        }
+                    });
+                }
+            }
+        {% endif %}
+    });
+    
+</script>
 {% endblock %}
