@@ -5,10 +5,8 @@ from decimal import Decimal
 # Create your models here.
 
 class Bank(models.Model):
-    # Модель для зберігання інформації про банки 
     name = models.CharField(max_length=100, unique=True, verbose_name="Назва банку")
     logo = models.ImageField(upload_to='bank_logos/', blank=True, null=True, verbose_name="Логотип")
-
 
     class Meta:
         verbose_name = "Банк"
@@ -38,12 +36,9 @@ class Account(models.Model):
     def __str__(self):
         return self.account_name
 
-#Розраховує поточний баланс рахунку, підсумовуючи всі пов'язані з ним транзакції.
-    
-@property
-def calculated_balance(self):
-    result = self.transactions.aggregate(
-        total=Sum('amount')
-    )['total']
-    
-    return result or Decimal('0.00')
+    @property
+    def calculated_balance(self):
+        result = self.transactions.aggregate(
+            total=Sum('amount')
+        )['total']
+        return result or Decimal('0.00')
