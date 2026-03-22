@@ -1,8 +1,9 @@
 import logging
+import calendar as cal_mod
 from django.db.models import Sum, Q
-from django.db.models.functions import TruncMonth
+from django.db.models.functions import TruncMonth, TruncDate
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
 from .models import Transaction
 
 logger = logging.getLogger(__name__)
@@ -95,3 +96,30 @@ class TransactionRepository:
             expenses=Sum('amount', filter=Q(amount__lt=0)),
             incomes=Sum('amount', filter=Q(amount__gt=0)),
         ).order_by('account__bank__name')
+
+    # ─── Calendar ───────────────────────────────────────────────
+
+    def get_calendar_data(self, year, month):
+        """Денні витрати + доходи за вказаний місяць."""
+        last_day = cal_mod.monthrange(year, month)[1]
+        start = date(year, month, 1)
+        end = date(year, month, last_day)
+
+        daily = self.get_queryset().filter(
+            transaction_date__date__gte=start,
+            transaction_date__date__lte=end,
+        ).annotate(
+            day=TruncDate('transaction_date'),
+        ).values('day').annotate(
+            expenses=Sum('amount', filter=Q(amount__lt=0)),
+            incomes=Sum('amount', filter=Q(amount__gt=0)),
+        ).order_by('day')
+
+        return daily
+
+    def get_calendar_day_transactions(self, year, month, day):
+        """Транзакції за конкретний день."""
+        target = date(year, month, day)
+        return self.get_queryset().filter(
+            transaction_date__date=target,
+        ).order_by('-transaction_date')

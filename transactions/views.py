@@ -15,12 +15,18 @@ from django.db.models import Q
 from django.views.decorators.http import require_POST
 
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import status as http_status
 
 from .models import Transaction, TransactionUpload, Category
 from .forms import UploadStatementForm, ManualTransactionForm
-from .serializers import TransactionSerializer
+from .serializers import (
+    TransactionSerializer, TransactionWriteSerializer,
+    CategorySerializer, UploadSerializer,
+)
 from .repositories import TransactionRepository
 from .services import process_upload
 from accounts.models import Bank
@@ -94,6 +100,198 @@ class UpdateFilterAPI(APIView):
         except Exception as ex:
             logger.exception("Помилка оновлення фільтра")
             return Response({'status': 'err', 'message': str(ex)}, status=400)
+
+
+# ─── Transaction CRUD API ───────────────────────────────────────
+
+class TransactionListAPI(ListAPIView):
+    """Список транзакцій з фільтрацією та пагінацією."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self):
+        qs = Transaction.objects.filter(
+            account__user=self.request.user,
+        ).select_related('category', 'account', 'account__bank').order_by('-transaction_date')
+
+        params = self.request.query_params
+
+        if params.get('category'):
+            qs = qs.filter(category_id=params['category'])
+        if params.get('type') == 'income':
+            qs = qs.filter(amount__gt=0)
+        elif params.get('type') == 'expense':
+            qs = qs.filter(amount__lt=0)
+        if params.get('date_from'):
+            qs = qs.filter(transaction_date__date__gte=params['date_from'])
+        if params.get('date_to'):
+            qs = qs.filter(transaction_date__date__lte=params['date_to'])
+        if params.get('search'):
+            qs = qs.filter(description__icontains=params['search'])
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 30))
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+
+        serializer = self.get_serializer(page_obj, many=True)
+        return Response({
+            'results': serializer.data,
+            'count': paginator.count,
+            'num_pages': paginator.num_pages,
+            'current_page': page,
+        })
+
+
+class TransactionCreateAPI(APIView):
+    """Ручне додавання транзакції."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = TransactionWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Знаходимо або створюємо акаунт "Ручний"
+        from accounts.models import Account
+        account, _ = Account.objects.get_or_create(
+            user=request.user,
+            account_name='Ручний',
+            defaults={'account_type': 'CASH', 'currency': 'UAH'},
+        )
+
+        transaction = serializer.save(
+            user=request.user,
+            account=account,
+            source='manual',
+        )
+        return Response(
+            TransactionSerializer(transaction).data,
+            status=http_status.HTTP_201_CREATED,
+        )
+
+
+class TransactionDetailAPI(RetrieveUpdateDestroyAPIView):
+    """Перегляд / редагування / видалення транзакції."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self):
+        return Transaction.objects.filter(
+            account__user=self.request.user,
+        ).select_related('category')
+
+
+# ─── Categories API ─────────────────────────────────────────────
+
+class CategoryListAPI(APIView):
+    """Список категорій (системні + користувацькі)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        categories = Category.objects.filter(
+            Q(user=request.user) | Q(is_system=True)
+        ).order_by('type', 'name')
+        return Response(CategorySerializer(categories, many=True).data)
+
+
+# ─── Calendar API ───────────────────────────────────────────────
+
+class CalendarAPI(APIView):
+    """Дані для календаря витрат: щоденні суми за місяць."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            year = int(request.query_params.get('year', date.today().year))
+            month = int(request.query_params.get('month', date.today().month))
+        except (ValueError, TypeError):
+            year, month = date.today().year, date.today().month
+
+        repo = TransactionRepository(request.user)
+        daily_data = list(repo.get_calendar_data(year, month))
+
+        # Серіалізуємо дати та Decimal
+        result = []
+        for item in daily_data:
+            result.append({
+                'day': item['day'].isoformat() if item['day'] else None,
+                'expenses': float(abs(item['expenses'] or 0)),
+                'incomes': float(item['incomes'] or 0),
+            })
+
+        return Response({
+            'year': year,
+            'month': month,
+            'days': result,
+        })
+
+
+class CalendarDayAPI(APIView):
+    """Транзакції за конкретний день для календаря."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, year, month, day):
+        repo = TransactionRepository(request.user)
+        transactions = repo.get_calendar_day_transactions(year, month, day)
+        return Response(TransactionSerializer(transactions, many=True).data)
+
+
+# ─── Uploads / File Manager API ────────────────────────────────
+
+class UploadListAPI(APIView):
+    """Список завантажених виписок."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        uploads = TransactionUpload.objects.filter(
+            user=request.user,
+        ).select_related('bank').order_by('-uploaded_at')
+        serializer = UploadSerializer(uploads, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request):
+        """Завантаження нової виписки."""
+        serializer = UploadSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        upload = serializer.save(user=request.user)
+        try:
+            process_upload(upload)
+        except Exception as e:
+            logger.exception("Помилка обробки завантаження #%s", upload.id)
+            upload.status = 'FAILED'
+            upload.processing_log = str(e)
+            upload.save()
+        return Response(
+            UploadSerializer(upload, context={'request': request}).data,
+            status=http_status.HTTP_201_CREATED,
+        )
+
+
+class UploadDetailAPI(APIView):
+    """Видалення завантаження."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        upload = get_object_or_404(TransactionUpload, id=pk, user=request.user)
+        upload.file.delete()
+        upload.delete()
+        return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+# ─── Banks API ──────────────────────────────────────────────────
+
+class BankListAPI(APIView):
+    """Список банків."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        banks = Bank.objects.all().values('id', 'name')
+        return Response(list(banks))
 
 
 # ═══════════════════════════════════════════════════════════════

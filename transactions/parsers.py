@@ -117,21 +117,30 @@ class MonobankExcelParser(BankStatementParser):
         return transactions
 
 
-# ─── ПУМБ (PDF) ────────────────────────────────────────────────
+# ПУМБ (PDF)
 
 class PumbPdfParser(BankStatementParser):
     EXPENSE_KEYWORDS = ('покупка', 'комісія', 'списання', 'переказ')
-
     def parse(self, file_path: str) -> List[Dict]:
+        
         transactions = []
+        headers = None 
+        
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
                 table = page.extract_table()
                 if not table:
                     continue
 
-                df = pd.DataFrame(table[1:], columns=table[0])
-                df.columns = [col.replace('\n', ' ') for col in df.columns]
+                if headers is None:
+                    headers = table[0]
+                    page_data = table[1:]
+                else:
+                    page_data = table
+
+
+                df = pd.DataFrame(page_data, columns=headers)
+                df.columns = [col.replace('\n', ' ') if isinstance(col,str) else '' for col in df.columns]
 
                 for _, row in df.iterrows():
                     raw_date = row.get('Дата та час операції')
