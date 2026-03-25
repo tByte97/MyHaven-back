@@ -173,3 +173,168 @@ class ExportDataView(APIView):
             ],
         }
         return Response(data)
+
+# ─── TOTP 2FA Views ───────────────────────────────────────────────────────
+
+
+class TOTPSetupView(APIView):
+    """Генерація QR коду для налаштування TOTP."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        import pyotp
+        import qrcode
+        from io import BytesIO
+        import base64
+
+        from .serializers import TOTPSetupSerializer
+
+        # Generate new secret
+        secret = pyotp.random_base32()
+
+        # Create provisioning URI for QR code
+        totp = pyotp.TOTP(secret)
+        uri = totp.provisioning_uri(
+            name=request.user.email,
+            issuer_name='MyHaven'
+        )
+
+        # Generate QR code
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(uri)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+
+        data = {
+            'qr_code': f'data:image/png;base64,{img_str}',
+            'secret': secret
+        }
+
+        serializer = TOTPSetupSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data)
+
+
+class TOTPEnableView(APIView):
+    """Активація TOTP після верифікації коду."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        import pyotp
+        from .serializers import TOTPEnableSerializer
+
+        serializer = TOTPEnableSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        secret = serializer.validated_data['secret']
+        code = serializer.validated_data['code']
+
+        # Verify the code
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(code, valid_window=1):
+            return Response(
+                {'error': 'Невірний код. Спробуйте ще раз.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save secret and enable TOTP
+        request.user.totp_secret = secret
+        request.user.totp_enabled = True
+        request.user.save()
+
+        logger.info("User %s enabled TOTP 2FA", request.user.id)
+        return Response({'detail': 'TOTP успішно увімкнено.'})
+
+
+class TOTPDisableView(APIView):
+    """Вимкнення TOTP (потребує пароль)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .serializers import TOTPDisableSerializer
+
+        serializer = TOTPDisableSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        password = serializer.validated_data['password']
+
+        if not request.user.check_password(password):
+            return Response(
+                {'error': 'Невірний пароль.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        request.user.totp_secret = None
+        request.user.totp_enabled = False
+        request.user.save()
+
+        logger.info("User %s disabled TOTP 2FA", request.user.id)
+        return Response({'detail': 'TOTP вимкнено.'})
+
+
+class TOTPVerifyView(APIView):
+    """Верифікація TOTP коду (для логіну)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        import pyotp
+        from .serializers import TOTPVerifySerializer
+
+        serializer = TOTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if not request.user.totp_enabled or not request.user.totp_secret:
+            return Response(
+                {'error': 'TOTP не увімкнено для цього користувача.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        code = serializer.validated_data['code']
+        totp = pyotp.TOTP(request.user.totp_secret)
+
+        if totp.verify(code, valid_window=1):
+            return Response({'detail': 'Код підтверджено.', 'verified': True})
+        else:
+            return Response(
+                {'error': 'Невірний код.', 'verified': False},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+# ─── Preferences & Notifications Views ──────────────────────────────────────
+
+
+class UpdatePreferencesView(APIView):
+    """Оновлення налаштувань теми, мови, валюти."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        from .serializers import PreferencesSerializer
+
+        serializer = PreferencesSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        logger.info("User %s updated preferences", request.user.id)
+        return Response(serializer.data)
+
+
+class UpdateNotificationSettingsView(APIView):
+    """Оновлення налаштувань повідомлень."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        from .serializers import NotificationSettingsSerializer
+
+        serializer = NotificationSettingsSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        logger.info("User %s updated notification settings", request.user.id)
+        return Response(serializer.data)

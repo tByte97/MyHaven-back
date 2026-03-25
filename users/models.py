@@ -4,6 +4,38 @@ from django.contrib.auth.models import AbstractUser
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True, verbose_name="Електронна пошта")
 
+    # TOTP 2FA
+    totp_secret = models.CharField(max_length=32, blank=True, null=True)
+    totp_enabled = models.BooleanField(default=False)
+
+    # Preferences
+    theme = models.CharField(
+        max_length=10,
+        choices=[('light', 'Light'), ('dark', 'Dark'), ('auto', 'Auto')],
+        default='light'
+    )
+    language = models.CharField(
+        max_length=5,
+        choices=[('uk', 'Українська'), ('en', 'English')],
+        default='uk'
+    )
+    currency = models.CharField(
+        max_length=3,
+        choices=[('UAH', 'UAH'), ('USD', 'USD'), ('EUR', 'EUR')],
+        default='UAH'
+    )
+
+    # Notifications
+    email_notifications = models.BooleanField(default=True)
+    telegram_notifications = models.BooleanField(default=False)
+    notify_large_expense = models.BooleanField(default=True)
+    notify_budget_exceeded = models.BooleanField(default=True)
+    notify_daily_summary = models.BooleanField(default=False)
+
+    # Telegram Integration
+    telegram_user_id = models.BigIntegerField(blank=True, null=True, unique=True)
+    telegram_username = models.CharField(max_length=100, blank=True, null=True)
+
     def __str__(self):
         return self.email
     
