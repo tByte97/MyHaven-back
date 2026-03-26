@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -e
+
+echo "[pre-push] Running backend tests..."
+
+if [ -x ".venv/Scripts/python.exe" ]; then
+  PYTHON_BIN=".venv/Scripts/python.exe"
+else
+  PYTHON_BIN="python"
+fi
+
+"$PYTHON_BIN" manage.py test tests -v 2
+
+echo "[pre-push] Tests passed. Push allowed."
