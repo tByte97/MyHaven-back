@@ -17,7 +17,7 @@ from .serializers import UserRegSerializer, ProfileSerializer, ChangePasswordSer
 logger = logging.getLogger(__name__)
 
 
-# ─── Template Views ──────────────────────────────────────────────────────
+#Template Views
 
 @login_required
 def home_view(request):
@@ -62,8 +62,7 @@ def logout_view(request):
     return redirect(conf_settings.LOGOUT_REDIRECT_URL)
 
 
-# ─── REST API Views ───────────────────────────────────────────────────────
-
+#REST API Views
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegSerializer
     permission_classes = [AllowAny]
@@ -81,7 +80,7 @@ class CurrentUserView(APIView):
 
 
 class ProfileView(APIView):
-    """Отримати або оновити профіль користувача."""
+    # Отримати або оновити профіль користувача
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -96,7 +95,7 @@ class ProfileView(APIView):
 
 
 class ChangePasswordView(APIView):
-    """Зміна пароля поточного користувача."""
+    # Зміна пароля поточного користувача
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -116,7 +115,7 @@ class ChangePasswordView(APIView):
 
 
 class DeleteAccountView(APIView):
-    """Видалення акаунта (потребує підтвердження пароля)."""
+    # Видалення акаунта + підтвердження пароля
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -133,7 +132,7 @@ class DeleteAccountView(APIView):
 
 
 class ExportDataView(APIView):
-    """Експорт всіх даних користувача у JSON."""
+    # Експорт всіх даних користувача у JSON
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -174,21 +173,18 @@ class ExportDataView(APIView):
         }
         return Response(data)
 
-# ─── TOTP 2FA Views ───────────────────────────────────────────────────────
-
+#TOTP 2FA Views
+import pyotp
+import qrcode
+from io import BytesIO
+import base64
+from .serializers import TOTPSetupSerializer
 
 class TOTPSetupView(APIView):
-    """Генерація QR коду для налаштування TOTP."""
+    # Генерація QR коду для налаштування TOTP
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        import pyotp
-        import qrcode
-        from io import BytesIO
-        import base64
-
-        from .serializers import TOTPSetupSerializer
-
         # Generate new secret
         secret = pyotp.random_base32()
 
@@ -220,14 +216,13 @@ class TOTPSetupView(APIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
 
+from .serializers import TOTPEnableSerializer
 
 class TOTPEnableView(APIView):
-    """Активація TOTP після верифікації коду."""
+    # Активація TOTP після верифікації 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        import pyotp
-        from .serializers import TOTPEnableSerializer
 
         serializer = TOTPEnableSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -253,7 +248,7 @@ class TOTPEnableView(APIView):
 
 
 class TOTPDisableView(APIView):
-    """Вимкнення TOTP (потребує пароль)."""
+    # Вимкнення TOTP (потребує пароль)
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -278,14 +273,14 @@ class TOTPDisableView(APIView):
         return Response({'detail': 'TOTP вимкнено.'})
 
 
+
+from .serializers import TOTPVerifySerializer
+
 class TOTPVerifyView(APIView):
-    """Верифікація TOTP коду (для логіну)."""
+    # Верифікація TOTP коду для логіну
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        import pyotp
-        from .serializers import TOTPVerifySerializer
-
         serializer = TOTPVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -307,11 +302,11 @@ class TOTPVerifyView(APIView):
             )
 
 
-# ─── Preferences & Notifications Views ──────────────────────────────────────
+#Preferences & Notifications Views
 
 
 class UpdatePreferencesView(APIView):
-    """Оновлення налаштувань теми, мови, валюти."""
+    # Оновлення налаштувань теми, мови, валюти
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
@@ -326,7 +321,7 @@ class UpdatePreferencesView(APIView):
 
 
 class UpdateNotificationSettingsView(APIView):
-    """Оновлення налаштувань повідомлень."""
+    # Оновлення налаштувань повідомлень
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
