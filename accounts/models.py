@@ -6,7 +6,6 @@ from decimal import Decimal
 
 class Bank(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Назва банку")
-    logo = models.ImageField(upload_to='bank_logos/', blank=True, null=True, verbose_name="Логотип")
 
     class Meta:
         verbose_name = "Банк"
@@ -23,7 +22,6 @@ class Account(models.Model):
 
     account_name = models.CharField(max_length=100, verbose_name="Назва рахунку")
     account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES, default='CARD')
-    last_four_digits = models.CharField(max_length=4, blank=True, verbose_name="Останні 4 цифри")
     currency = models.CharField(max_length=3, default='UAH')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

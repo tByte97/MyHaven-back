@@ -21,7 +21,6 @@ class Category(models.Model):
 
 
 class Transaction(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions', null=True, blank=True)
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions', null = True, blank = True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

@@ -29,6 +29,32 @@ class TransactionRepository:
             qs = qs.filter(source_upload__id__in=self.upload_ids)
         return qs
 
+    def get_filtered_transactions(
+        self,
+        category_id=None,
+        transaction_type=None,
+        date_from=None,
+        date_to=None,
+        search=None,
+    ):
+        """Отримати транзакції з фільтрами для списку."""
+        qs = self.get_queryset().order_by('-transaction_date')
+
+        if category_id:
+            qs = qs.filter(category_id=category_id)
+        if transaction_type == 'income':
+            qs = qs.filter(amount__gt=0)
+        elif transaction_type == 'expense':
+            qs = qs.filter(amount__lt=0)
+        if date_from:
+            qs = qs.filter(transaction_date__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(transaction_date__date__lte=date_to)
+        if search:
+            qs = qs.filter(description__icontains=search)
+
+        return qs
+
     # ─── KPI & Dashboard ────────────────────────────────────────
 
     def get_dashboard_kpi(self):

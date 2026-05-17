@@ -4,6 +4,8 @@ Views делегують сюди, а не містять логіку само�
 """
 import logging
 import os
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import List, Dict, Tuple
 
 from django.db import transaction as db_transaction
@@ -41,30 +43,47 @@ def _create_transactions(
     account: Account,
     upload: TransactionUpload,
     parsed_data: List[Dict],
+    matcher: CategoryMatcher = None,
 ) -> Tuple[int, int]:
     """
     Створює транзакції з розпарсених даних. Уникає дублікатів через get_or_create.
     Повертає (created_count, skipped_count).
     """
-    matcher = CategoryMatcher(account.user)
+    if matcher is None:
+        matcher = CategoryMatcher(account.user)
     created_count = 0
     skipped_count = 0
 
     for row in parsed_data:
+        description = str(row.get('description') or '').strip()
+        if not description:
+            skipped_count += 1
+            continue
+
+        tx_date = row.get('date')
+        if not isinstance(tx_date, datetime):
+            skipped_count += 1
+            continue
+
+        amount = _normalize_amount(row.get('amount'))
+        if amount == 0:
+            skipped_count += 1
+            continue
+
         category, confidence = matcher.match(
-            row['description'],
+            description,
             row.get('bank_category', ''),
-            float(row['amount']),
+            float(amount),
         )
 
         _, created = Transaction.objects.get_or_create(
             account=account,
-            transaction_date=row['date'],
-            amount=row['amount'],
-            description=row['description'],
+            transaction_date=tx_date,
+            amount=amount,
+            description=description,
             defaults={
                 'category': category,
-                'raw_description': row.get('description', ''),
+                'raw_description': description,
                 'bank_category': row.get('bank_category', ''),
                 'matched_automatically': category is not None,
                 'confidence_score': confidence,
@@ -82,6 +101,15 @@ def _create_transactions(
         account.id, created_count, skipped_count,
     )
     return created_count, skipped_count
+
+
+def _normalize_amount(value) -> Decimal:
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal('0')
 
 
 # ─── Upload processing (єдина точка входу) ─────────────────────

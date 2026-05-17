@@ -110,26 +110,15 @@ class TransactionListAPI(ListAPIView):
     serializer_class = TransactionSerializer
 
     def get_queryset(self):
-        qs = Transaction.objects.filter(
-            account__user=self.request.user,
-        ).select_related('category', 'account', 'account__bank').order_by('-transaction_date')
-
         params = self.request.query_params
-
-        if params.get('category'):
-            qs = qs.filter(category_id=params['category'])
-        if params.get('type') == 'income':
-            qs = qs.filter(amount__gt=0)
-        elif params.get('type') == 'expense':
-            qs = qs.filter(amount__lt=0)
-        if params.get('date_from'):
-            qs = qs.filter(transaction_date__date__gte=params['date_from'])
-        if params.get('date_to'):
-            qs = qs.filter(transaction_date__date__lte=params['date_to'])
-        if params.get('search'):
-            qs = qs.filter(description__icontains=params['search'])
-
-        return qs
+        repo = TransactionRepository(self.request.user)
+        return repo.get_filtered_transactions(
+            category_id=params.get('category'),
+            transaction_type=params.get('type'),
+            date_from=params.get('date_from'),
+            date_to=params.get('date_to'),
+            search=params.get('search'),
+        )
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -165,7 +154,6 @@ class TransactionCreateAPI(APIView):
         )
 
         transaction = serializer.save(
-            user=request.user,
             account=account,
             source='manual',
         )
@@ -345,7 +333,6 @@ def add_manual_transaction(request):
         form = ManualTransactionForm(request.POST)
         if form.is_valid():
             transaction = form.save(commit=False)
-            transaction.user = request.user
             transaction.source = 'manual'
             transaction.save()
     return redirect('transactions:dashboard')
