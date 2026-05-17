@@ -1,0 +1,354 @@
+# ============================================================
+#  MyHaven — AI Voice Integration Configuration
+#  Формат: TOML  |  Версія: 1.0  |  16 травня 2026
+# ============================================================
+
+[project]
+name        = "MyHaven AI Voice Bot"
+version     = "1.0.0"
+description = "Голосовий ШІ-асистент для управління фінансами через Telegram"
+diploma     = true
+
+# ============================================================
+# ФАЗА 0 — Підготовка середовища
+# ============================================================
+
+[phase.zero]
+name        = "Підготовка"
+status      = "pending"   # pending | in_progress | done
+priority    = 1
+
+[phase.zero.system_deps]
+ffmpeg        = "https://ffmpeg.org/download.html"
+ffmpeg_path   = "C:\\ffmpeg\\bin"
+add_to_path   = true
+verify_cmd    = "ffmpeg -version"
+
+[phase.zero.python_deps]
+activate_venv = ".venv\\Scripts\\activate"
+
+[[phase.zero.python_deps.packages]]
+name    = "faster-whisper"
+version = "1.1.1"
+purpose = "STT — розпізнавання мови локально"
+
+[[phase.zero.python_deps.packages]]
+name    = "google-generativeai"
+version = "0.8.3"
+purpose = "LLM — Gemini API (фаза 1)"
+
+[[phase.zero.python_deps.packages]]
+name    = "pydub"
+version = "0.25.1"
+purpose = "Обробка аудіо форматів"
+
+# ============================================================
+# ФАЗА 1 — FastWhisper (локально) + Gemini API
+# ============================================================
+
+[phase.one]
+name     = "FastWhisper + Gemini API"
+status   = "pending"
+priority = 2
+
+[phase.one.stt]
+engine      = "faster-whisper"
+model       = "medium"       # tiny | base | small | medium | large
+device      = "cpu"          # cpu | cuda (якщо є GPU Nvidia)
+compute     = "int8"         # int8 = економія RAM на CPU
+language    = "uk"           # Ukrainian
+beam_size   = 5
+model_size_gb = 1.5          # завантажується автоматично при першому запуску
+
+[phase.one.llm]
+provider  = "gemini"
+model     = "gemini-2.0-flash"
+api_key   = "GEMINI_API_KEY"   # env var name
+get_key_url = "https://aistudio.google.com"
+response_format = "application/json"
+free_tier_rpm   = 60          # requests per minute на free tier
+
+[phase.one.env_vars]
+GEMINI_API_KEY     = "AIza...your_key_here"
+AI_PROVIDER        = "gemini"
+WHISPER_MODEL      = "medium"
+OLLAMA_URL         = "http://localhost:11434"
+OLLAMA_MODEL       = "llama3.1:8b"
+
+[[phase.one.steps]]
+id     = 1
+title  = "Отримати Gemini API ключ"
+url    = "https://aistudio.google.com"
+action = "Get API Key → скопіювати → вставити в .env"
+done   = false
+
+[[phase.one.steps]]
+id     = 2
+title  = "Встановити залежності"
+cmd    = "pip install faster-whisper==1.1.1 google-generativeai==0.8.3 pydub==0.25.1"
+done   = false
+
+[[phase.one.steps]]
+id     = 3
+title  = "Створити telegrambot/ai_processor.py"
+file   = "telegrambot/ai_processor.py"
+type   = "new"
+contains = ["AIProcessor", "transcribe()", "parse_intent()", "_gemini_parse()", "_ollama_parse()"]
+done   = false
+
+[[phase.one.steps]]
+id     = 4
+title  = "Оновити bot_config.py"
+file   = "telegrambot/bot_config.py"
+type   = "modify"
+add_fields = ["gemini_api_key", "ai_provider", "whisper_model", "ollama_url", "ollama_model"]
+done   = false
+
+[[phase.one.steps]]
+id     = 5
+title  = "Оновити handlers.py — ініціалізація AIProcessor"
+file   = "telegrambot/handlers.py"
+type   = "modify"
+add_imports = ["datetime", "os", "tempfile", "AIProcessor"]
+add_to_init = "self._ai = AIProcessor(...)"
+done   = false
+
+[[phase.one.steps]]
+id     = 6
+title  = "Додати метод voice_message до BotServices"
+file   = "telegrambot/handlers.py"
+type   = "modify"
+method = "voice_message"
+trigger = "filters.VOICE"
+pipeline = ["завантажити OGG", "STT → текст", "LLM → intent", "_dispatch_intent"]
+done   = false
+
+[[phase.one.steps]]
+id     = 7
+title  = "Додати метод _dispatch_intent до BotServices"
+file   = "telegrambot/handlers.py"
+type   = "modify"
+method = "_dispatch_intent"
+actions_handled = [
+  "create_transaction",
+  "get_transactions",
+  "get_dashboard",
+  "create_budget",
+  "get_budgets",
+  "delete_transaction",
+  "update_transaction",
+  "unknown",
+]
+done   = false
+
+[[phase.one.steps]]
+id     = 8
+title  = "Зареєструвати Voice хендлер у register_handlers()"
+file   = "telegrambot/handlers.py"
+type   = "modify"
+add_line = "application.add_handler(MessageHandler(filters.VOICE, services.voice_message))"
+done   = false
+
+[[phase.one.steps]]
+id     = 9
+title  = "Перший запуск та тест"
+cmd    = "python -m telegrambot"
+test_commands = [
+  "Витратив 150 грн на таксі сьогодні",
+  "Покажи мій баланс",
+  "Встанови бюджет на їжу 3000 грн",
+]
+done   = false
+
+# ============================================================
+# ФАЗА 2 — Ollama (повністю локальна LLM)
+# ============================================================
+
+[phase.two]
+name     = "Ollama — повністю локально"
+status   = "pending"
+priority = 3
+note     = "Код з фази 1 НЕ змінюється — лише .env"
+
+[phase.two.llm]
+engine        = "ollama"
+server_url    = "http://localhost:11434"
+download_url  = "https://ollama.ai/download"
+
+[[phase.two.llm.models]]
+name         = "llama3.1:8b"
+size_gb      = 5
+ram_required = "8 GB"
+quality      = "recommended"
+cmd          = "ollama pull llama3.1:8b"
+
+[[phase.two.llm.models]]
+name         = "mistral:7b"
+size_gb      = 4
+ram_required = "8 GB"
+quality      = "good"
+cmd          = "ollama pull mistral:7b"
+
+[[phase.two.steps]]
+id     = 1
+title  = "Завантажити та встановити Ollama"
+url    = "https://ollama.ai/download"
+done   = false
+
+[[phase.two.steps]]
+id     = 2
+title  = "Завантажити модель"
+cmd    = "ollama pull llama3.1:8b"
+size   = "~5 GB"
+done   = false
+
+[[phase.two.steps]]
+id     = 3
+title  = "Запустити Ollama сервер"
+cmd    = "ollama serve"
+url    = "http://localhost:11434"
+done   = false
+
+[[phase.two.steps]]
+id     = 4
+title  = "Змінити .env — AI_PROVIDER"
+file   = "telegrambot/.env"
+change = "AI_PROVIDER=gemini → AI_PROVIDER=ollama"
+code_changes = false
+done   = false
+
+[[phase.two.steps]]
+id     = 5
+title  = "Тест Ollama API"
+cmd    = 'curl http://localhost:11434/api/generate -d "{\"model\":\"llama3.1:8b\",\"prompt\":\"Say: ok\",\"stream\":false}"'
+done   = false
+
+[[phase.two.steps]]
+id     = 6
+title  = "Повний тест голосових команд"
+test_commands = [
+  "Витратив 200 грн на їжу",
+  "Покажи бюджети цього місяця",
+  "Що я витрачав вчора?",
+]
+done   = false
+
+# ============================================================
+# ТЕСТОВІ СЦЕНАРІЇ
+# ============================================================
+
+[[test_scenarios]]
+voice_input    = "Витратив 150 грн на таксі сьогодні"
+expected_action = "create_transaction"
+expected_api   = "POST /api/telegram/transactions/"
+expected_payload = {amount = -150, category_name = "Таксі"}
+
+[[test_scenarios]]
+voice_input    = "Покажи мій баланс"
+expected_action = "get_dashboard"
+expected_api   = "GET /api/telegram/dashboard/"
+
+[[test_scenarios]]
+voice_input    = "Що я витрачав вчора?"
+expected_action = "get_transactions"
+expected_api   = "GET /api/telegram/transactions/"
+
+[[test_scenarios]]
+voice_input    = "Встанови бюджет на їжу 3000 грн цього місяця"
+expected_action = "create_budget"
+expected_api   = "POST /api/telegram/budgets/"
+
+[[test_scenarios]]
+voice_input    = "Покажи мої бюджети"
+expected_action = "get_budgets"
+expected_api   = "GET /api/telegram/budgets/"
+
+[[test_scenarios]]
+voice_input    = "Видали транзакцію 42"
+expected_action = "delete_transaction"
+expected_api   = "DELETE /api/telegram/transactions/42/"
+
+[[test_scenarios]]
+voice_input    = "Привіт як справи"
+expected_action = "unknown"
+expected_api   = "none"
+
+# ============================================================
+# ПОРІВНЯННЯ КОНФІГУРАЦІЙ
+# ============================================================
+
+[comparison]
+
+[comparison.phase_one]
+stt         = "faster-whisper medium (local)"
+llm         = "Gemini 2.0 Flash (cloud)"
+privacy     = "partial"     # STT локально, LLM у хмарі
+speed_llm   = "~1 sec"
+cost        = "free_tier"
+difficulty  = "low"
+code_lines_added = 120
+
+[comparison.phase_two]
+stt         = "faster-whisper medium (local)"
+llm         = "LLaMA 3.1 8B via Ollama (local)"
+privacy     = "full"
+speed_llm   = "10-30 sec (CPU)"
+cost        = "free"
+difficulty  = "medium"
+code_lines_added = 0        # тільки .env змінюється!
+
+# ============================================================
+# МІНІМАЛЬНІ ВИМОГИ ДО ЗАЛІЗA
+# ============================================================
+
+[hardware]
+
+[hardware.phase_one]
+ram_gb      = 4
+disk_gb     = 3             # faster-whisper medium ~1.5 GB
+gpu         = false
+internet    = true          # для Gemini API
+
+[hardware.phase_two]
+ram_gb      = 10            # 8 GB для LLaMA 3.1 8B
+disk_gb     = 8             # 1.5 GB whisper + 5 GB llama
+gpu         = false         # рекомендовано, але не обов'язково
+gpu_vram_gb = 8             # якщо GPU — VRAM ≥ 8 GB для 8B моделі
+internet    = false         # повністю офлайн
+
+# ============================================================
+# ЗАЛЕЖНОСТІ ПРОЕКТУ — ПІСЛЯ ІНТЕГРАЦІЇ
+# ============================================================
+
+[dependencies]
+file = "telegrambot/requirements.txt"
+
+[[dependencies.packages]]
+name    = "python-telegram-bot"
+version = "==21.6"
+phase   = 0
+
+[[dependencies.packages]]
+name    = "httpx"
+version = "==0.27.0"
+phase   = 0
+
+[[dependencies.packages]]
+name    = "python-dotenv"
+version = "==1.0.1"
+phase   = 0
+
+[[dependencies.packages]]
+name    = "faster-whisper"
+version = "==1.1.1"
+phase   = 1
+
+[[dependencies.packages]]
+name    = "google-generativeai"
+version = "==0.8.3"
+phase   = 1
+
+[[dependencies.packages]]
+name    = "pydub"
+version = "==0.25.1"
+phase   = 1
