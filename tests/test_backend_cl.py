@@ -93,28 +93,24 @@ class BackendCLUnitTests(TestCase):
         now = timezone.now()
 
         Transaction.objects.create(
-            user=user_a,
             account=account_a,
             amount=Decimal('-100.00'),
             description='Groceries',
             transaction_date=now,
         )
         Transaction.objects.create(
-            user=user_a,
             account=account_a,
             amount=Decimal('250.00'),
             description='Salary part',
             transaction_date=now,
         )
         Transaction.objects.create(
-            user=user_a,
             account=account_a,
             amount=Decimal('-999.00'),
             description='Old expense',
             transaction_date=now - timezone.timedelta(days=40),
         )
         Transaction.objects.create(
-            user=user_b,
             account=account_b,
             amount=Decimal('1000.00'),
             description='Foreign user income',
