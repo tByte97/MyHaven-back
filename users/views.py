@@ -1,18 +1,33 @@
+import base64
 import logging
+from io import BytesIO
 
-from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout, authenticate
+import pyotp
+import qrcode
+from django.conf import settings as conf_settings
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
-from django.conf import settings as conf_settings
-
+from django.shortcuts import redirect, render
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .forms import RegisterForm
-from .serializers import UserRegSerializer, ProfileSerializer, ChangePasswordSerializer
+from .serializers import (
+    ChangePasswordSerializer,
+    NotificationSettingsSerializer,
+    PreferencesSerializer,
+    PrivateProfileSerializer,
+    TOTPDisableSerializer,
+    TOTPEnableSerializer,
+    TOTPSetupSerializer,
+    TOTPVerifySerializer,
+    UserRegSerializer,
+)
+from .services import AccountDeletionService, ExportService, TelegramLinkService
 
 logger = logging.getLogger(__name__)
 
@@ -79,19 +94,12 @@ class CurrentUserView(APIView):
         })
 
 
-class ProfileView(APIView):
-    # Отримати або оновити профіль користувача
+class ProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = PrivateProfileSerializer
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        serializer = ProfileSerializer(request.user)
-        return Response(serializer.data)
-
-    def patch(self, request):
-        serializer = ProfileSerializer(request.user, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+    def get_object(self):
+        return self.request.user
 
 
 class ChangePasswordView(APIView):
@@ -125,10 +133,16 @@ class DeleteAccountView(APIView):
                 {'password': ['Невірний пароль.']},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        user_id = request.user.id
-        request.user.delete()
-        logger.info("User %s deleted their account", user_id)
-        return Response({'detail': 'Акаунт видалено.'}, status=status.HTTP_204_NO_CONTENT)
+        try:
+            AccountDeletionService.delete_user_account(request.user)
+        except Exception as exc:
+            logger.exception("Failed to delete account for user %s", request.user.id)
+            return Response(
+                {'error': 'Не вдалося видалити акаунт.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({'detail': 'Акаунт видалено.'}, status=status.HTTP_200_OK)
 
 
 class ExportDataView(APIView):
@@ -136,49 +150,69 @@ class ExportDataView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from transactions.models import Transaction, TransactionUpload
-        from transactions.serializers import TransactionSerializer
-        from budgets.models import Budget
-
-        user = request.user
-        transactions = Transaction.objects.filter(
-            account__user=user,
-        ).select_related('category', 'account')
-
-        budgets = Budget.objects.filter(user=user).select_related('category')
-
-        uploads = TransactionUpload.objects.filter(user=user)
-
-        data = {
-            'profile': ProfileSerializer(user).data,
-            'transactions': TransactionSerializer(transactions, many=True).data,
-            'budgets': [
-                {
-                    'category': b.category.name,
-                    'month': str(b.month),
-                    'amount': str(b.amount),
-                }
-                for b in budgets
-            ],
-            'uploads': [
-                {
-                    'id': u.id,
-                    'bank': str(u.bank) if u.bank else None,
-                    'status': u.status,
-                    'uploaded_at': u.uploaded_at.isoformat(),
-                    'total_transactions': u.total_transactions,
-                }
-                for u in uploads
-            ],
-        }
+        data = ExportService.export_all_data(request.user)
         return Response(data)
 
-#TOTP 2FA Views
-import pyotp
-import qrcode
-from io import BytesIO
-import base64
-from .serializers import TOTPSetupSerializer
+
+class TelegramLinkCodeCreateView(APIView):
+    """Generate a one-time secret code for Telegram linking."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        secret, expires_at = TelegramLinkService.generate_link_code(request.user)
+        return Response({
+            'secret': secret,
+            'expires_at': expires_at.isoformat(),
+        })
+
+
+class TelegramLinkExchangeView(APIView):
+    """Exchange a secret code for JWT tokens and bind Telegram account."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        secret = request.data.get('secret')
+        telegram_user_id = request.data.get('telegram_user_id')
+        telegram_username = request.data.get('telegram_username')
+
+        if not secret or telegram_user_id is None:
+            return Response(
+                {'detail': 'secret and telegram_user_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            telegram_user_id = int(telegram_user_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'telegram_user_id must be an integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = TelegramLinkService.exchange_link_code(
+                secret,
+                telegram_user_id,
+                telegram_username,
+            )
+        except ValueError as exc:
+            if str(exc) == 'telegram_id_taken':
+                return Response(
+                    {'detail': 'telegram_user_id is already linked.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return Response(
+                {'detail': 'secret is invalid or expired.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        })
 
 class TOTPSetupView(APIView):
     # Генерація QR коду для налаштування TOTP
@@ -216,8 +250,6 @@ class TOTPSetupView(APIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
 
-from .serializers import TOTPEnableSerializer
-
 class TOTPEnableView(APIView):
     # Активація TOTP після верифікації 
     permission_classes = [IsAuthenticated]
@@ -252,8 +284,6 @@ class TOTPDisableView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .serializers import TOTPDisableSerializer
-
         serializer = TOTPDisableSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -272,9 +302,6 @@ class TOTPDisableView(APIView):
         logger.info("User %s disabled TOTP 2FA", request.user.id)
         return Response({'detail': 'TOTP вимкнено.'})
 
-
-
-from .serializers import TOTPVerifySerializer
 
 class TOTPVerifyView(APIView):
     # Верифікація TOTP коду для логіну
@@ -310,8 +337,6 @@ class UpdatePreferencesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        from .serializers import PreferencesSerializer
-
         serializer = PreferencesSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -325,8 +350,6 @@ class UpdateNotificationSettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        from .serializers import NotificationSettingsSerializer
-
         serializer = NotificationSettingsSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()

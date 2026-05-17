@@ -4,6 +4,7 @@ from .views import (
     ChangePasswordView, DeleteAccountView, ExportDataView,
     TOTPSetupView, TOTPEnableView, TOTPDisableView, TOTPVerifyView,
     UpdatePreferencesView, UpdateNotificationSettingsView,
+    TelegramLinkCodeCreateView, TelegramLinkExchangeView,
 )
 
 urlpatterns = [
@@ -23,4 +24,8 @@ urlpatterns = [
     # Preferences & Notifications
     path('preferences/', UpdatePreferencesView.as_view(), name='api_update_preferences'),
     path('notifications/', UpdateNotificationSettingsView.as_view(), name='api_update_notifications'),
+
+    # Telegram linking
+    path('telegram/link-code/', TelegramLinkCodeCreateView.as_view(), name='api_telegram_link_code'),
+    path('telegram/link/', TelegramLinkExchangeView.as_view(), name='api_telegram_link_exchange'),
 ]

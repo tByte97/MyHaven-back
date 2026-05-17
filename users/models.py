@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True, verbose_name="Електронна пошта")
@@ -38,5 +39,24 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class TelegramLinkCode(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='telegram_link_codes',
+    )
+    code_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Telegram Link Code"
+        verbose_name_plural = "Telegram Link Codes"
+
+    def __str__(self):
+        return f"Telegram link code for {self.user_id}"
     
 

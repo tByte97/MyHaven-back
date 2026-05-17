@@ -21,7 +21,15 @@ class UserRegSerializer(serializers.ModelSerializer):
         return user
 
 
-class ProfileSerializer(serializers.ModelSerializer):
+class PublicProfileSerializer(serializers.ModelSerializer):
+    """Публічні дані профілю (мінімум полів)."""
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'first_name', 'last_name', 'date_joined')
+
+
+class PrivateProfileSerializer(serializers.ModelSerializer):
+    """Приватний профіль для власника акаунта."""
     date_joined = serializers.DateTimeField(read_only=True)
 
     class Meta:
@@ -29,11 +37,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name', 'date_joined',
             'totp_enabled', 'theme', 'language', 'currency',
-            'email_notifications', 'telegram_notifications',
-            'notify_large_expense', 'notify_budget_exceeded', 'notify_daily_summary',
-            'telegram_user_id', 'telegram_username'
         )
-        read_only_fields = ('id', 'date_joined', 'totp_enabled', 'telegram_user_id', 'telegram_username')
+        read_only_fields = ('id', 'date_joined', 'totp_enabled')
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -62,6 +67,14 @@ class NotificationSettingsSerializer(serializers.ModelSerializer):
             'email_notifications', 'telegram_notifications',
             'notify_large_expense', 'notify_budget_exceeded', 'notify_daily_summary'
         )
+
+
+class TelegramProfileSerializer(serializers.ModelSerializer):
+    """Технічні поля профілю для Telegram інтеграції."""
+    class Meta:
+        model = User
+        fields = ('telegram_user_id', 'telegram_username', 'telegram_notifications')
+        read_only_fields = ('telegram_user_id', 'telegram_username')
 
 
 class TOTPSetupSerializer(serializers.Serializer):
