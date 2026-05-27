@@ -6,7 +6,7 @@ from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -26,6 +26,20 @@ from transactions.services import process_upload
 logger = logging.getLogger(__name__)
 
 
+class IsActiveTelegramLink(BasePermission):
+    message = 'Telegram profile is not linked.'
+
+    def has_permission(self, request, view):
+        telegram_user_id = request.headers.get('X-Telegram-User-Id')
+        if not telegram_user_id:
+            return False
+        try:
+            telegram_user_id = int(telegram_user_id)
+        except (TypeError, ValueError):
+            return False
+        return request.user.is_authenticated and request.user.telegram_user_id == telegram_user_id
+
+
 def _get_or_create_telegram_account(user):
     account, _ = Account.objects.get_or_create(
         user=user,
@@ -36,11 +50,12 @@ def _get_or_create_telegram_account(user):
 
 
 class TelegramHealthAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         return Response({
             'status': 'ok',
+            'telegram_user_id': request.user.telegram_user_id,
             'capabilities': [
                 'dashboard', 'statistics', 'categories',
                 'transactions', 'budgets', 'calendar',
@@ -49,7 +64,7 @@ class TelegramHealthAPI(APIView):
 
 
 class TelegramDashboardAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         repo = TransactionRepository(request.user)
@@ -65,7 +80,7 @@ class TelegramDashboardAPI(APIView):
 
 
 class TelegramStatisticsAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         repo = TransactionRepository(request.user)
@@ -84,7 +99,7 @@ class TelegramStatisticsAPI(APIView):
 
 
 class TelegramTransactionListAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         params = request.query_params
@@ -111,7 +126,10 @@ class TelegramTransactionListAPI(APIView):
         })
 
     def post(self, request):
-        serializer = TransactionWriteSerializer(data=request.data)
+        serializer = TransactionWriteSerializer(
+            data=request.data,
+            context={'request': request},
+        )
         serializer.is_valid(raise_exception=True)
 
         account = _get_or_create_telegram_account(request.user)
@@ -127,7 +145,7 @@ class TelegramTransactionListAPI(APIView):
 
 
 class TelegramUploadStatementAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -178,7 +196,7 @@ class TelegramUploadStatementAPI(APIView):
 
 
 class TelegramTransactionDetailAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request, pk):
         transaction = get_object_or_404(
@@ -191,7 +209,10 @@ class TelegramTransactionDetailAPI(APIView):
             Transaction, id=pk, account__user=request.user
         )
         serializer = TransactionWriteSerializer(
-            transaction, data=request.data, partial=True
+            transaction,
+            data=request.data,
+            partial=True,
+            context={'request': request},
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -206,7 +227,7 @@ class TelegramTransactionDetailAPI(APIView):
 
 
 class TelegramCategoryListAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         categories = Category.objects.filter(user=request.user)
@@ -216,7 +237,7 @@ class TelegramCategoryListAPI(APIView):
 
 
 class TelegramBudgetListAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         queryset = Budget.objects.filter(user=request.user).select_related('category')
@@ -226,14 +247,17 @@ class TelegramBudgetListAPI(APIView):
         return Response(BudgetSerializer(queryset, many=True).data)
 
     def post(self, request):
-        serializer = BudgetCreateSerializer(data=request.data)
+        serializer = BudgetCreateSerializer(
+            data=request.data,
+            context={'request': request},
+        )
         serializer.is_valid(raise_exception=True)
         budget = serializer.save(user=request.user)
         return Response(BudgetSerializer(budget).data, status=status.HTTP_201_CREATED)
 
 
 class TelegramBudgetDetailAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request, pk):
         budget = get_object_or_404(Budget, id=pk, user=request.user)
@@ -241,7 +265,12 @@ class TelegramBudgetDetailAPI(APIView):
 
     def patch(self, request, pk):
         budget = get_object_or_404(Budget, id=pk, user=request.user)
-        serializer = BudgetCreateSerializer(budget, data=request.data, partial=True)
+        serializer = BudgetCreateSerializer(
+            budget,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(BudgetSerializer(budget).data)
@@ -253,7 +282,7 @@ class TelegramBudgetDetailAPI(APIView):
 
 
 class TelegramCalendarAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request):
         try:
@@ -281,7 +310,7 @@ class TelegramCalendarAPI(APIView):
 
 
 class TelegramCalendarDayAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveTelegramLink]
 
     def get(self, request, year, month, day):
         repo = TransactionRepository(request.user)

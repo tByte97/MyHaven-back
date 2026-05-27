@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Tuple
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core import signing
+from django.core.mail import send_mail
 from django.db import transaction as db_transaction
 from django.utils import timezone
 
@@ -28,8 +30,11 @@ class ExportService:
 
     @staticmethod
     def export_all_data(user) -> Dict:
+        profile = PrivateProfileSerializer(user).data
+        profile.pop('telegram_user_id', None)
+        profile.pop('telegram_username', None)
         return {
-            'profile': PrivateProfileSerializer(user).data,
+            'profile': profile,
             'preferences': PreferencesSerializer(user).data,
             'notifications': NotificationSettingsSerializer(user).data,
             'transactions': ExportService._export_transactions(user),
@@ -86,6 +91,86 @@ class AccountDeletionService:
         logger.info("User %s account deleted successfully", user_id)
 
 
+class SecurityNotificationService:
+    """Email notifications for sensitive account events."""
+
+    @staticmethod
+    def send_password_changed(user) -> None:
+        SecurityNotificationService._send(
+            subject='MyHaven: password changed',
+            message=(
+                f'Hello, {user.username}!\n\n'
+                'Your MyHaven account password was changed successfully.\n'
+                'If this was not you, change the password immediately and contact support.'
+            ),
+            recipients=[user.email],
+        )
+
+    @staticmethod
+    def send_email_changed(user, old_email: str, new_email: str) -> None:
+        old_message = (
+            f'Hello, {user.username}!\n\n'
+            f'The email for your MyHaven account was changed from {old_email} to {new_email}.\n'
+            'If you did not request this change, secure your account immediately.'
+        )
+        new_message = (
+            f'Hello, {user.username}!\n\n'
+            f'This address ({new_email}) was added as the new email for your MyHaven account.\n'
+            'If this change was unexpected, please contact support.'
+        )
+
+        SecurityNotificationService._send(
+            subject='MyHaven: email changed',
+            message=old_message,
+            recipients=[old_email],
+        )
+        if new_email != old_email:
+            SecurityNotificationService._send(
+                subject='MyHaven: new email confirmed',
+                message=new_message,
+                recipients=[new_email],
+            )
+
+    @staticmethod
+    def _send(subject: str, message: str, recipients: List[str]) -> None:
+        if not recipients:
+            return
+        if not settings.EMAIL_HOST or not settings.DEFAULT_FROM_EMAIL:
+            logger.warning('Security email skipped: email backend is not configured.')
+            return
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=recipients,
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception('Failed to send security email to %s', recipients)
+
+
+class TOTPLoginService:
+    """Utility helpers for two-step JWT login flow."""
+
+    TOKEN_SALT = 'users.totp.login'
+    TOKEN_MAX_AGE_SECONDS = 300
+
+    @staticmethod
+    def create_login_token(user) -> str:
+        return signing.dumps({'user_id': user.id}, salt=TOTPLoginService.TOKEN_SALT)
+
+    @staticmethod
+    def resolve_login_token(token: str):
+        payload = signing.loads(
+            token,
+            salt=TOTPLoginService.TOKEN_SALT,
+            max_age=TOTPLoginService.TOKEN_MAX_AGE_SECONDS,
+        )
+        return get_user_model().objects.get(id=payload['user_id'])
+
+
 class TelegramLinkService:
     """Service for generating and exchanging Telegram link codes."""
 
@@ -126,23 +211,50 @@ class TelegramLinkService:
         if not link:
             raise ValueError("invalid_or_expired")
 
-        user_model = get_user_model()
-        already_linked = user_model.objects.filter(
-            telegram_user_id=telegram_user_id,
-        ).exclude(id=link.user_id).exists()
-        if already_linked:
-            raise ValueError("telegram_id_taken")
-
         user = link.user
-        user.telegram_user_id = telegram_user_id
-        if telegram_username:
-            user.telegram_username = telegram_username
-        user.save(update_fields=['telegram_user_id', 'telegram_username'])
+        TelegramLinkService.link_user(
+            user,
+            telegram_user_id,
+            telegram_username,
+        )
 
         link.used_at = timezone.now()
         link.save(update_fields=['used_at'])
 
         return user
+
+    @staticmethod
+    def link_user(
+        user,
+        telegram_user_id: int,
+        telegram_username: Optional[str] = None,
+    ) -> None:
+        user_model = get_user_model()
+        already_linked = user_model.objects.filter(
+            telegram_user_id=telegram_user_id,
+        ).exclude(id=user.id).exists()
+        if already_linked:
+            raise ValueError("telegram_id_taken")
+
+        user.telegram_user_id = telegram_user_id
+        user.telegram_username = telegram_username or None
+        user.save(update_fields=['telegram_user_id', 'telegram_username'])
+
+    @staticmethod
+    def unlink_user(user) -> None:
+        TelegramLinkCode.objects.filter(
+            user=user,
+            used_at__isnull=True,
+        ).update(used_at=timezone.now())
+
+        user.telegram_user_id = None
+        user.telegram_username = None
+        user.telegram_notifications = False
+        user.save(update_fields=[
+            'telegram_user_id',
+            'telegram_username',
+            'telegram_notifications',
+        ])
 
     @staticmethod
     def _hash_code(code: str) -> str:

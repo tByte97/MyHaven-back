@@ -1,7 +1,43 @@
 import logging
+from difflib import SequenceMatcher
 from .models import Category
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_category_text(value: str) -> str:
+    text = (value or '').strip().lower()
+    replacements = {
+        'йі': 'ї',
+        'йи': 'ї',
+        'іжа': 'їжа',
+        'іжу': 'їжа',
+        'ізя': 'їжа',
+        'ізю': 'їжа',
+        'ізью': 'їжа',
+        'изя': 'їжа',
+        'изю': 'їжа',
+        'изью': 'їжа',
+        'йиж': 'їж',
+        'йізя': 'їжа',
+        'йізю': 'їжа',
+        'їзя': 'їжа',
+        'їзю': 'їжа',
+        'їзью': 'їжа',
+        'їжу': 'їжа',
+        'їжі': 'їжа',
+        'їжею': 'їжа',
+        'jizha': 'їжа',
+        'yizha': 'їжа',
+        'продуктів': 'продукти',
+        'продукты': 'продукти',
+        'такси': 'таксі',
+        'комуналка': 'комунальні',
+    }
+    text = text.replace('ґ', 'г').replace('ғ', 'г')
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    return ' '.join(text.replace('-', ' ').replace('_', ' ').split())
 
 class CategoryMatcher:
     def __init__(self, user):
@@ -56,7 +92,6 @@ class CategoryMatcher:
 
         score = 0
         
-        # Збіг з категорією банку
         if bank_category:
              if bank_category in category_name.lower() or category_name.lower() in bank_category:
                  score += 1.5
@@ -64,7 +99,6 @@ class CategoryMatcher:
                  if keyword.lower() in bank_category:
                      score += 1.0
 
-        # Збіг з ключовими словами
         for keyword in keywords:
             keyword_lower = keyword.lower()
             if f" {keyword_lower} " in f" {description} ": 
@@ -72,7 +106,6 @@ class CategoryMatcher:
             elif keyword_lower in description:
                 score += 0.7
         
-        # Збіг типу
         if (category_type == 'INCOME' and amount > 0):
             score += 0.2
         elif (category_type == 'EXPENSE' and amount < 0):
@@ -94,6 +127,51 @@ def find_category_for_transaction(user, description: str, bank_category: str = '
     
     logger.debug("No match for: '%s…'", description[:30])
     return None, 0
+
+
+def find_category_by_name(user, category_name: str):
+    normalized = _normalize_category_text(category_name)
+    if not normalized:
+        return None
+
+    categories = list(
+        Category.objects.filter(user=user) |
+        Category.objects.filter(is_system=True)
+    )
+
+    for category in categories:
+        if _normalize_category_text(category.name) == normalized:
+            return category
+
+    for category in categories:
+        name = _normalize_category_text(category.name)
+        if normalized in name or name in normalized:
+            return category
+
+    for category in categories:
+        for keyword in category.keywords or []:
+            keyword = _normalize_category_text(str(keyword))
+            if keyword and (normalized == keyword or normalized in keyword or keyword in normalized):
+                return category
+
+    best_category = None
+    best_score = 0.0
+    for category in categories:
+        candidates = [category.name, *(category.keywords or [])]
+        for candidate in candidates:
+            candidate_norm = _normalize_category_text(str(candidate))
+            if not candidate_norm:
+                continue
+            score = SequenceMatcher(None, normalized, candidate_norm).ratio()
+            if score > best_score:
+                best_score = score
+                best_category = category
+
+    if best_score >= 0.78:
+        return best_category
+
+    return None
+
 
 def create_default_categories(user):
     default_categories = [

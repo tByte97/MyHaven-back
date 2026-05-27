@@ -142,7 +142,10 @@ class TransactionCreateAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = TransactionWriteSerializer(data=request.data)
+        serializer = TransactionWriteSerializer(
+            data=request.data,
+            context={'request': request},
+        )
         serializer.is_valid(raise_exception=True)
 
         # Знаходимо або створюємо акаунт "Ручний"

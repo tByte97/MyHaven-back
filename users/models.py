@@ -3,6 +3,27 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 
 class CustomUser(AbstractUser):
+    LANGUAGE_CHOICES = [
+        ('uk', 'Українська'),
+        ('en', 'English'),
+        ('de', 'Deutsch'),
+        ('es', 'Español'),
+        ('pl', 'Polski'),
+    ]
+    THEME_CHOICES = [
+        ('light', 'Frost'),
+        ('dark', 'Abyss'),
+        ('auto', 'System'),
+    ]
+    CURRENCY_CHOICES = [
+        ('UAH', 'UAH'),
+        ('USD', 'USD'),
+        ('EUR', 'EUR'),
+        ('PLN', 'PLN'),
+        ('GBP', 'GBP'),
+        ('CHF', 'CHF'),
+    ]
+
     email = models.EmailField(unique=True, verbose_name="Електронна пошта")
 
     # TOTP 2FA
@@ -12,19 +33,26 @@ class CustomUser(AbstractUser):
     # Preferences
     theme = models.CharField(
         max_length=10,
-        choices=[('light', 'Light'), ('dark', 'Dark'), ('auto', 'Auto')],
+        choices=THEME_CHOICES,
         default='light'
     )
     language = models.CharField(
         max_length=5,
-        choices=[('uk', 'Українська'), ('en', 'English')],
+        choices=LANGUAGE_CHOICES,
         default='uk'
     )
     currency = models.CharField(
         max_length=3,
-        choices=[('UAH', 'UAH'), ('USD', 'USD'), ('EUR', 'EUR')],
+        choices=CURRENCY_CHOICES,
         default='UAH'
     )
+    display_currency = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default='UAH',
+    )
+    tracking_sources = models.JSONField(default=list, blank=True)
+    onboarding_completed = models.BooleanField(default=False)
 
     # Notifications
     email_notifications = models.BooleanField(default=True)

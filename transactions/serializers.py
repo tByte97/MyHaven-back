@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Transaction, Category, TransactionUpload
+from .categorization import find_category_by_name
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -25,10 +26,43 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 class TransactionWriteSerializer(serializers.ModelSerializer):
     """Серіалізатор для створення/редагування транзакцій."""
+    category_name = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
+
     class Meta:
         model = Transaction
-        fields = ['id', 'amount', 'description', 'transaction_date', 'category']
+        fields = [
+            'id',
+            'amount',
+            'description',
+            'transaction_date',
+            'category',
+            'category_name',
+        ]
         read_only_fields = ['id']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        category_name = (attrs.pop('category_name', '') or '').strip()
+
+        if not attrs.get('category') and category_name:
+            request = self.context.get('request')
+            if not request or not request.user or not request.user.is_authenticated:
+                raise serializers.ValidationError({
+                    'category_name': 'Authenticated user is required to resolve category_name.'
+                })
+
+            category = find_category_by_name(request.user, category_name)
+            if not category:
+                raise serializers.ValidationError({
+                    'category_name': f'Category "{category_name}" was not found.'
+                })
+            attrs['category'] = category
+
+        return attrs
 
 
 class UploadSerializer(serializers.ModelSerializer):

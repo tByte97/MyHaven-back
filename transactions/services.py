@@ -18,7 +18,7 @@ from accounts.models import Account, Bank
 logger = logging.getLogger(__name__)
 
 
-# ─── Account helpers ────────────────────────────────────────────
+# Account helpers
 
 def get_or_create_account(user, bank: Bank) -> Account:
     """Повертає існуючий або створює новий рахунок для пари (user, bank)."""
