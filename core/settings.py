@@ -161,6 +161,18 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Ліміти для users/throttling.py та throttle_scope у views.
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': os.getenv('THROTTLE_AUTH', '10/min'),
+        'totp': os.getenv('THROTTLE_TOTP', '5/min'),
+        'password': os.getenv('THROTTLE_PASSWORD', '5/min'),
+        'register': os.getenv('THROTTLE_REGISTER', '5/hour'),
+        'telegram': os.getenv('THROTTLE_TELEGRAM', '10/min'),
+        'token_refresh': os.getenv('THROTTLE_TOKEN_REFRESH', '30/min'),
+    },
+    # Кількість reverse proxy перед Django (nginx = 1). Без цього за проксі
+    # усі клієнти мають одну IP і ділять один ліміт.
+    'NUM_PROXIES': int(os.environ['DJANGO_NUM_PROXIES']) if os.getenv('DJANGO_NUM_PROXIES') else None,
 }
 
 SIMPLE_JWT = {

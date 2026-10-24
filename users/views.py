@@ -14,7 +14,9 @@ from django.shortcuts import redirect, render
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .forms import RegisterForm
@@ -32,6 +34,7 @@ from .serializers import (
     TOTPVerifySerializer,
     UserRegSerializer,
 )
+from .throttling import TelegramIdentityThrottle, form_request_allowed
 from .services import (
     AccountDeletionService,
     ExportService,
@@ -60,6 +63,11 @@ def home_view(request):
 
 def register(request):
     if request.method == 'POST':
+        if not form_request_allowed(request, 'register'):
+            return render(
+                request, 'register.html',
+                {'form': RegisterForm(), 'throttled': True}, status=429,
+            )
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
@@ -76,6 +84,11 @@ def login_view(request):
         return redirect(conf_settings.LOGIN_REDIRECT_URL)
 
     if request.method == 'POST':
+        if not form_request_allowed(request, 'auth'):
+            return render(
+                request, 'login.html',
+                {'form': AuthenticationForm(), 'throttled': True}, status=429,
+            )
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = authenticate(
@@ -96,13 +109,22 @@ def logout_view(request):
 
 
 # REST API Views
+class ThrottledTokenRefreshView(TokenRefreshView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'token_refresh'
+
+
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
 
 
 class TelegramRegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [TelegramIdentityThrottle]
+    throttle_scope = 'telegram'
 
     def post(self, request):
         serializer = TelegramRegisterSerializer(data=request.data)
@@ -135,6 +157,8 @@ class TelegramRegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -161,6 +185,8 @@ class LoginView(APIView):
 
 class LoginTOTPVerifyView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'totp'
 
     def post(self, request):
         serializer = TOTPLoginChallengeSerializer(data=request.data)
@@ -218,6 +244,8 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password'
 
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data)
@@ -238,6 +266,8 @@ class ChangePasswordView(APIView):
 
 class DeleteAccountView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password'
 
     def post(self, request):
         password = request.data.get('password', '')
@@ -288,6 +318,8 @@ class TelegramUnlinkView(APIView):
 
 class TelegramLinkExchangeView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [TelegramIdentityThrottle]
+    throttle_scope = 'telegram'
 
     def post(self, request):
         secret = request.data.get('secret')
@@ -358,6 +390,8 @@ class TOTPSetupView(APIView):
 
 class TOTPEnableView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'totp'
 
     def post(self, request):
         serializer = TOTPEnableSerializer(data=request.data)
@@ -382,6 +416,8 @@ class TOTPEnableView(APIView):
 
 class TOTPDisableView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password'
 
     def post(self, request):
         serializer = TOTPDisableSerializer(data=request.data)
@@ -404,6 +440,8 @@ class TOTPDisableView(APIView):
 
 class TOTPVerifyView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'totp'
 
     def post(self, request):
         serializer = TOTPVerifySerializer(data=request.data)
