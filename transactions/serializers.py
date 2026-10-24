@@ -1,7 +1,7 @@
 from django.urls import reverse
 from rest_framework import serializers
 from .models import Transaction, Category, TransactionUpload
-from .categorization import find_category_by_name
+from .categorization import categories_visible_to, find_category_by_name
 from .uploads import display_name
 
 
@@ -45,6 +45,14 @@ class TransactionWriteSerializer(serializers.ModelSerializer):
             'category_name',
         ]
         read_only_fields = ['id']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # ID чужої категорії має давати ту саму помилку, що й неіснуючий.
+        request = self.context.get('request')
+        self.fields['category'].queryset = categories_visible_to(
+            getattr(request, 'user', None)
+        )
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

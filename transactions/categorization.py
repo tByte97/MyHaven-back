@@ -1,8 +1,17 @@
 import logging
 from difflib import SequenceMatcher
+from django.db.models import Q
+
 from .models import Category
 
 logger = logging.getLogger(__name__)
+
+
+def categories_visible_to(user):
+    """Категорії, які користувач може призначати: власні та системні."""
+    if user is None or not user.is_authenticated:
+        return Category.objects.none()
+    return Category.objects.filter(Q(user=user) | Q(is_system=True))
 
 
 def _normalize_category_text(value: str) -> str:
