@@ -12,7 +12,8 @@ class TelegramIdentityThrottle(ScopedRateThrottle):
     """
     Запити Telegram-реєстрації та обміну link-коду приходять з IP бота,
     тому лише IP поділив би один ліміт між усіма користувачами Telegram.
-    Ключ — IP + telegram_user_id із тіла запиту.
+    Ключ — IP + telegram_user_id із тіла запиту (йому можна довіряти:
+    ці ендпоінти вимагають секрет бота, див. users.permissions).
     """
 
     def get_cache_key(self, request, view):

@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework.throttling import SimpleRateThrottle
 
@@ -84,12 +84,14 @@ class AuthThrottlingTests(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('Pass1234!'))
 
+    @override_settings(TELEGRAM_BOT_API_SECRET='test-bot-secret')
     def test_telegram_link_limit_is_per_telegram_user(self):
         def exchange(telegram_user_id):
             return self.client.post(
                 '/api/users/telegram/link/',
                 {'secret': 'guess', 'telegram_user_id': telegram_user_id},
                 format='json',
+                HTTP_X_MYHAVEN_BOT_SECRET='test-bot-secret',
             )
 
         blocked = self._exhaust('telegram', lambda: exchange(111))

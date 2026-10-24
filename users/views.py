@@ -34,6 +34,7 @@ from .serializers import (
     TOTPVerifySerializer,
     UserRegSerializer,
 )
+from .permissions import IsTelegramBot
 from .throttling import TelegramIdentityThrottle, form_request_allowed
 from .services import (
     AccountDeletionService,
@@ -122,7 +123,7 @@ class RegisterView(generics.CreateAPIView):
 
 
 class TelegramRegisterView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsTelegramBot]
     throttle_classes = [TelegramIdentityThrottle]
     throttle_scope = 'telegram'
 
@@ -317,7 +318,7 @@ class TelegramUnlinkView(APIView):
 
 
 class TelegramLinkExchangeView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsTelegramBot]
     throttle_classes = [TelegramIdentityThrottle]
     throttle_scope = 'telegram'
 

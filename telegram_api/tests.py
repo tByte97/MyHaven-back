@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -11,7 +11,10 @@ from accounts.models import Bank, Account
 from budgets.models import Budget
 from transactions.models import Category, Transaction
 
+BOT_SECRET = 'test-bot-secret'
 
+
+@override_settings(TELEGRAM_BOT_API_SECRET=BOT_SECRET)
 class TelegramApiTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
@@ -22,7 +25,10 @@ class TelegramApiTests(TestCase):
         )
         self.client = APIClient()
         self.client.force_authenticate(self.user)
-        self.client.credentials(HTTP_X_TELEGRAM_USER_ID='987654321')
+        self.client.credentials(
+            HTTP_X_TELEGRAM_USER_ID='987654321',
+            HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET,
+        )
 
     def _create_category(self, name='Food', category_type='EXPENSE', system=False):
         return Category.objects.create(
@@ -51,13 +57,17 @@ class TelegramApiTests(TestCase):
     def test_telegram_api_rejects_missing_telegram_header(self):
         client = APIClient()
         client.force_authenticate(self.user)
+        client.credentials(HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET)
 
         response = client.get('/api/telegram/health/')
 
         self.assertEqual(response.status_code, 403)
 
     def test_telegram_api_rejects_mismatched_telegram_header(self):
-        self.client.credentials(HTTP_X_TELEGRAM_USER_ID='111')
+        self.client.credentials(
+            HTTP_X_TELEGRAM_USER_ID='111',
+            HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET,
+        )
 
         response = self.client.get('/api/telegram/health/')
 

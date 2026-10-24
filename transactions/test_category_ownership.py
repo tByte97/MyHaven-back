@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -67,13 +67,17 @@ class CategoryOwnershipTests(TestCase):
         self.assertEqual(self._create_transaction(self.own_expense).status_code, 201)
         self.assertEqual(self._create_transaction(self.system_expense).status_code, 201)
 
+    @override_settings(TELEGRAM_BOT_API_SECRET='test-bot-secret')
     def test_telegram_patch_cannot_assign_foreign_category(self):
         account = Account.objects.create(user=self.user, account_name='Main')
         transaction = Transaction.objects.create(
             account=account, amount=Decimal('-10'), description='Таксі',
             transaction_date=timezone.now(), category=self.own_expense,
         )
-        self.client.credentials(HTTP_X_TELEGRAM_USER_ID='1001')
+        self.client.credentials(
+            HTTP_X_TELEGRAM_USER_ID='1001',
+            HTTP_X_MYHAVEN_BOT_SECRET='test-bot-secret',
+        )
 
         response = self.client.patch(
             f'/api/telegram/transactions/{transaction.id}/',

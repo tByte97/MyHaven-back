@@ -13,6 +13,8 @@ from budgets.models import Budget
 from transactions.models import Category, Transaction, TransactionUpload
 from users.services import AccountDeletionService, ExportService
 
+BOT_SECRET = 'test-bot-secret'
+
 
 class UserServicesTests(TestCase):
 	def setUp(self):
@@ -107,7 +109,13 @@ class UserServicesTests(TestCase):
 		self.assertEqual(TransactionUpload.objects.count(), 0)
 
 
+@override_settings(TELEGRAM_BOT_API_SECRET=BOT_SECRET)
 class TelegramLinkTests(TestCase):
+	def _bot_client(self):
+		client = APIClient()
+		client.credentials(HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET)
+		return client
+
 	def setUp(self):
 		self.user = get_user_model().objects.create_user(
 			username='linkuser',
@@ -116,7 +124,7 @@ class TelegramLinkTests(TestCase):
 		)
 
 	def test_telegram_register_creates_user_and_links_profile(self):
-		client = APIClient()
+		client = self._bot_client()
 		payload = {
 			'username': 'tgnewuser',
 			'email': 'tgnewuser@example.com',
@@ -153,7 +161,7 @@ class TelegramLinkTests(TestCase):
 		)
 		self.assertEqual(existing_user.telegram_user_id, 777888)
 
-		client = APIClient()
+		client = self._bot_client()
 		payload = {
 			'username': 'anotheruser',
 			'email': 'anotheruser@example.com',
@@ -173,13 +181,15 @@ class TelegramLinkTests(TestCase):
 		self.assertFalse(get_user_model().objects.filter(username='anotheruser').exists())
 
 	def test_link_code_exchange_returns_tokens(self):
-		client = APIClient()
+		client = self._bot_client()
 		client.force_authenticate(user=self.user)
 		response = client.post('/api/users/telegram/link-code/')
 		self.assertEqual(response.status_code, 200)
 		secret = response.data['secret']
 
 		client.force_authenticate(user=None)
+		# logout() у force_authenticate(None) скидає й заголовки.
+		client.credentials(HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET)
 		payload = {
 			'secret': secret,
 			'telegram_user_id': 123456789,
@@ -195,13 +205,15 @@ class TelegramLinkTests(TestCase):
 		self.assertEqual(self.user.telegram_username, 'tester')
 
 	def test_link_code_cannot_be_reused(self):
-		client = APIClient()
+		client = self._bot_client()
 		client.force_authenticate(user=self.user)
 		response = client.post('/api/users/telegram/link-code/')
 		self.assertEqual(response.status_code, 200)
 		secret = response.data['secret']
 
 		client.force_authenticate(user=None)
+		# logout() у force_authenticate(None) скидає й заголовки.
+		client.credentials(HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET)
 		first_response = client.post(
 			'/api/users/telegram/link/',
 			{'secret': secret, 'telegram_user_id': 123},
@@ -225,13 +237,15 @@ class TelegramLinkTests(TestCase):
 		)
 		self.assertEqual(other_user.telegram_user_id, 999)
 
-		client = APIClient()
+		client = self._bot_client()
 		client.force_authenticate(user=self.user)
 		response = client.post('/api/users/telegram/link-code/')
 		self.assertEqual(response.status_code, 200)
 		secret = response.data['secret']
 
 		client.force_authenticate(user=None)
+		# logout() у force_authenticate(None) скидає й заголовки.
+		client.credentials(HTTP_X_MYHAVEN_BOT_SECRET=BOT_SECRET)
 		response = client.post(
 			'/api/users/telegram/link/',
 			{'secret': secret, 'telegram_user_id': 999},
@@ -241,7 +255,7 @@ class TelegramLinkTests(TestCase):
 		self.assertEqual(response.status_code, 409)
 
 	def test_unlink_telegram_clears_profile_and_pending_codes(self):
-		client = APIClient()
+		client = self._bot_client()
 		self.user.telegram_user_id = 123456789
 		self.user.telegram_username = 'tester'
 		self.user.telegram_notifications = True

@@ -223,6 +223,10 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760
 # Ліміт розміру файлу виписки (FILE_UPLOAD_MAX_MEMORY_SIZE розмір не обмежує).
 STATEMENT_MAX_UPLOAD_SIZE = int(os.getenv('STATEMENT_MAX_UPLOAD_SIZE', str(10 * 1024 * 1024)))
 
+# Спільний секрет із Telegram-ботом (заголовок X-MyHaven-Bot-Secret).
+# Порожній — Telegram-ендпоінти для бота вимкнені.
+TELEGRAM_BOT_API_SECRET = os.getenv('TELEGRAM_BOT_API_SECRET', '')
+
 # email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', '')
