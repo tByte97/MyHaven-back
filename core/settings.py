@@ -226,6 +226,10 @@ STATEMENT_MAX_UPLOAD_SIZE = int(os.getenv('STATEMENT_MAX_UPLOAD_SIZE', str(10 * 
 # Спільний секрет із Telegram-ботом (заголовок X-MyHaven-Bot-Secret).
 # Порожній — Telegram-ендпоінти для бота вимкнені.
 TELEGRAM_BOT_API_SECRET = os.getenv('TELEGRAM_BOT_API_SECRET', '')
+# Токен бота для перевірки підпису Telegram WebApp initData; порожній —
+# вхід через WebApp вимкнено.
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_WEBAPP_AUTH_MAX_AGE = int(os.getenv('TELEGRAM_WEBAPP_AUTH_MAX_AGE', str(24 * 60 * 60)))
 
 # email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

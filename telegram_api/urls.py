@@ -12,10 +12,12 @@ from .views import (
     TelegramTransactionDetailAPI,
     TelegramTransactionListAPI,
     TelegramUploadStatementAPI,
+    TelegramWebAppAuthAPI,
 )
 
 urlpatterns = [
     path('health/', TelegramHealthAPI.as_view(), name='telegram_health'),
+    path('webapp-auth/', TelegramWebAppAuthAPI.as_view(), name='telegram_webapp_auth'),
     path('dashboard/', TelegramDashboardAPI.as_view(), name='telegram_dashboard'),
     path('statistics/', TelegramStatisticsAPI.as_view(), name='telegram_statistics'),
     path('categories/', TelegramCategoryListAPI.as_view(), name='telegram_categories'),

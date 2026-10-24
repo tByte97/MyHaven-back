@@ -2,12 +2,16 @@ import logging
 import os
 from datetime import date
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
 
 from accounts.models import Account, Bank
@@ -23,6 +27,8 @@ from transactions.serializers import (
 )
 from transactions.services import process_upload
 from users.permissions import IsTelegramBot
+
+from .webapp_auth import WebAppAuthError, validate_init_data
 from transactions.uploads import ALLOWED_STATEMENT_EXTENSIONS
 
 logger = logging.getLogger(__name__)
@@ -316,3 +322,41 @@ class TelegramCalendarDayAPI(APIView):
         repo = TransactionRepository(request.user)
         transactions = repo.get_calendar_day_transactions(year, month, day)
         return Response(TransactionSerializer(transactions, many=True).data)
+
+
+class TelegramWebAppAuthAPI(APIView):
+    """
+    Вхід у Telegram WebApp за підписаним Telegram initData замість JWT у URL.
+    Повертає лише короткоживучий access-токен: refresh не потрібен, бо
+    WebApp може повторно автентифікуватись свіжим initData.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        try:
+            telegram_user = validate_init_data(
+                request.data.get('init_data', ''),
+                settings.TELEGRAM_BOT_TOKEN,
+                settings.TELEGRAM_WEBAPP_AUTH_MAX_AGE,
+            )
+        except WebAppAuthError as exc:
+            logger.info('Telegram WebApp auth rejected: %s', exc)
+            return Response(
+                {'detail': 'Telegram WebApp data is invalid or expired.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        user = get_user_model().objects.filter(
+            telegram_user_id=int(telegram_user['id']),
+            is_active=True,
+        ).first()
+        if user is None:
+            return Response(
+                {'detail': 'Telegram account is not linked.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return Response({'access': str(AccessToken.for_user(user))})
