@@ -9,6 +9,6 @@ else
   PYTHON_BIN="python"
 fi
 
-"$PYTHON_BIN" manage.py test tests -v 2
+"$PYTHON_BIN" manage.py test -v 2
 
 echo "[pre-push] Tests passed. Push allowed."
