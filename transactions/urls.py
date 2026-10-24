@@ -4,7 +4,7 @@ from .views import (
     DashboardStatsAPI, StatisticsAPI, UpdateFilterAPI,
     TransactionListAPI, TransactionCreateAPI, TransactionDetailAPI,
     CategoryListAPI, CalendarAPI, CalendarDayAPI,
-    UploadListAPI, UploadDetailAPI, BankListAPI,
+    UploadListAPI, UploadDetailAPI, UploadFileAPI, BankListAPI,
 )
 
 app_name = 'transactions'
@@ -40,6 +40,7 @@ urlpatterns = [
     # Uploads / File Manager
     path('api/uploads/', UploadListAPI.as_view(), name='api-uploads'),
     path('api/uploads/<int:pk>/', UploadDetailAPI.as_view(), name='api-upload-detail'),
+    path('api/uploads/<int:pk>/file/', UploadFileAPI.as_view(), name='api-upload-file'),
 
     # Banks
     path('api/banks/', BankListAPI.as_view(), name='api-banks'),

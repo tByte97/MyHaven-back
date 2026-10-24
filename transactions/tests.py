@@ -13,6 +13,7 @@ from .models import Category, Transaction, TransactionUpload
 from .parsers import BankStatementParser
 from .repositories import TransactionRepository
 from .services import process_upload
+from .uploads import GENERIC_PROCESSING_ERROR
 
 
 class TransactionCriticalPathTests(TestCase):
@@ -198,7 +199,9 @@ class TransactionCriticalPathTests(TestCase):
 
         upload.refresh_from_db()
         self.assertEqual(upload.status, 'FAILED')
-        self.assertIn('broken parser', upload.processing_log)
+        # Текст внутрішнього винятку не має потрапляти користувачу.
+        self.assertNotIn('broken parser', upload.processing_log)
+        self.assertEqual(upload.processing_log, GENERIC_PROCESSING_ERROR)
 
     def test_clean_amount_handles_bank_formatting(self):
         self.assertEqual(BankStatementParser.clean_amount('1 234,56 UAH'), Decimal('1234.56'))

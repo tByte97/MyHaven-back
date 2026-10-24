@@ -7,6 +7,7 @@ import json
 from datetime import datetime, date
 from decimal import Decimal
 
+from django.http import FileResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -29,6 +30,7 @@ from .serializers import (
 )
 from .repositories import TransactionRepository
 from .services import process_upload
+from .uploads import display_name
 from accounts.models import Bank
 
 logger = logging.getLogger(__name__)
@@ -252,11 +254,10 @@ class UploadListAPI(APIView):
         upload = serializer.save(user=request.user)
         try:
             process_upload(upload)
-        except Exception as e:
-            logger.exception("Помилка обробки завантаження #%s", upload.id)
-            upload.status = 'FAILED'
-            upload.processing_log = str(e)
-            upload.save()
+        except Exception:
+            # process_upload уже залогував виняток і зберіг FAILED
+            # з безпечним повідомленням у processing_log.
+            pass
         return Response(
             UploadSerializer(upload, context={'request': request}).data,
             status=http_status.HTTP_201_CREATED,
@@ -272,6 +273,27 @@ class UploadDetailAPI(APIView):
         upload.file.delete()
         upload.delete()
         return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+class UploadFileAPI(APIView):
+    """Завантаження файлу виписки лише його власником."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        upload = get_object_or_404(TransactionUpload, id=pk, user=request.user)
+        if not upload.file:
+            raise Http404
+        try:
+            handle = upload.file.open('rb')
+        except FileNotFoundError:
+            raise Http404
+        response = FileResponse(
+            handle,
+            as_attachment=True,
+            filename=display_name(upload),
+        )
+        response['Cache-Control'] = 'private, no-store'
+        return response
 
 
 # ─── Banks API ──────────────────────────────────────────────────
@@ -303,9 +325,9 @@ def dashboard_view(request):
             try:
                 process_upload(upload)
                 messages.success(request, 'Виписку успішно завантажено та оброблено!')
-            except Exception as e:
-                logger.exception("Помилка обробки завантаження #%s", upload.id)
-                messages.error(request, f'Помилка обробки файлу: {e}')
+            except Exception:
+                upload.refresh_from_db(fields=['processing_log'])
+                messages.error(request, upload.processing_log)
         return redirect('transactions:dashboard')
 
     # ── GET: відображення даних ──

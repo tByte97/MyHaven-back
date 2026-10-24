@@ -13,6 +13,7 @@ from django.db import transaction as db_transaction
 from .models import Transaction, TransactionUpload
 from .parsers import get_parser_for_bank
 from .categorization import CategoryMatcher
+from .uploads import UploadProcessingError, public_error_message
 from accounts.models import Account, Bank
 
 logger = logging.getLogger(__name__)
@@ -130,11 +131,11 @@ def process_upload(upload: TransactionUpload) -> None:
 
         file_path = upload.file.path
         if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Файл не знайдено: {file_path}")
+            raise UploadProcessingError("Файл виписки не знайдено. Завантажте його ще раз.")
 
         parsed_data = parser.parse(file_path)
         if not parsed_data:
-            raise ValueError("Парсер не повернув даних. Перевірте формат файлу.")
+            raise UploadProcessingError("Парсер не повернув даних. Перевірте формат файлу.")
 
         upload.total_transactions = len(parsed_data)
         upload.save(update_fields=['total_transactions'])
@@ -153,6 +154,6 @@ def process_upload(upload: TransactionUpload) -> None:
     except Exception as e:
         logger.exception("Помилка обробки завантаження #%s", upload.id)
         upload.status = 'FAILED'
-        upload.processing_log = str(e)
+        upload.processing_log = public_error_message(e)
         upload.save()
         raise

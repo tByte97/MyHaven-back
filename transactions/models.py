@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from accounts.models import Account, Bank
+from .uploads import statement_upload_path, validate_statement_file
 
 class Category(models.Model):
     TRANSACTION_TYPES = (('INCOME', 'Дохід'), ('EXPENSE', 'Витрата'))
@@ -68,7 +69,10 @@ class TransactionUpload(models.Model):
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    file = models.FileField(upload_to='bank_statements/%Y/%m/')
+    file = models.FileField(
+        upload_to=statement_upload_path,
+        validators=[validate_statement_file],
+    )
     bank = models.ForeignKey(Bank, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
     uploaded_at = models.DateTimeField(auto_now_add=True)

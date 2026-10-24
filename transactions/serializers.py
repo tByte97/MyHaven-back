@@ -1,6 +1,8 @@
+from django.urls import reverse
 from rest_framework import serializers
 from .models import Transaction, Category, TransactionUpload
 from .categorization import find_category_by_name
+from .uploads import display_name
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -68,11 +70,12 @@ class TransactionWriteSerializer(serializers.ModelSerializer):
 class UploadSerializer(serializers.ModelSerializer):
     bank_name = serializers.CharField(source='bank.name', read_only=True, default=None)
     file_url = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
 
     class Meta:
         model = TransactionUpload
         fields = [
-            'id', 'bank', 'bank_name', 'file', 'file_url',
+            'id', 'bank', 'bank_name', 'file', 'file_url', 'file_name',
             'status', 'uploaded_at', 'total_transactions',
             'processed_transactions', 'processing_log',
         ]
@@ -80,11 +83,16 @@ class UploadSerializer(serializers.ModelSerializer):
             'id', 'status', 'uploaded_at',
             'total_transactions', 'processed_transactions', 'processing_log',
         ]
+        # Шлях у storage не віддаємо: файл доступний лише через file_url
+        # з перевіркою власника.
+        extra_kwargs = {'file': {'write_only': True}}
 
     def get_file_url(self, obj):
-        if obj.file:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.file.url)
-            return obj.file.url
-        return None
+        if not obj.file or not obj.pk:
+            return None
+        url = reverse('transactions:api-upload-file', args=[obj.pk])
+        request = self.context.get('request')
+        return request.build_absolute_uri(url) if request else url
+
+    def get_file_name(self, obj):
+        return display_name(obj)

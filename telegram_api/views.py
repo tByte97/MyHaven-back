@@ -22,6 +22,7 @@ from transactions.serializers import (
     UploadSerializer,
 )
 from transactions.services import process_upload
+from transactions.uploads import ALLOWED_STATEMENT_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +158,7 @@ class TelegramUploadStatementAPI(APIView):
             )
 
         ext = os.path.splitext(upload_file.name)[1].lower()
-        allowed_exts = {'.pdf', '.xls', '.xlsx', '.csv'}
-        if ext not in allowed_exts:
+        if ext not in ALLOWED_STATEMENT_EXTENSIONS:
             return Response(
                 {'detail': 'Unsupported file type. Use PDF/CSV or Excel (.xls, .xlsx).'},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -183,11 +183,10 @@ class TelegramUploadStatementAPI(APIView):
 
         try:
             process_upload(upload)
-        except Exception as e:
-            logger.exception("Помилка обробки завантаження #%s", upload.id)
-            upload.status = 'FAILED'
-            upload.processing_log = str(e)
-            upload.save(update_fields=['status', 'processing_log'])
+        except Exception:
+            # process_upload уже залогував виняток і зберіг FAILED
+            # з безпечним повідомленням у processing_log.
+            pass
 
         return Response(
             UploadSerializer(upload, context={'request': request}).data,
